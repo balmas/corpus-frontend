@@ -4,27 +4,42 @@ import * as BLTypes from '@/types/blacklabtypes';
 import * as AppTypes from '@/types/apptypes';
 import { FilterState, FullFilterState } from '@/store/search/form/filters';
 
-export function makeWildcardRegex(original: string) {
+/**
+ * Escapes the regex term. This is done by escaping all special characters on an individual basis.
+ * When wildcards should be preserved, the character * is replaced by .*, and the ? is replaced by .
+ *
+ * @param original the input string
+ * @param preserveWildcards whether to preserve wildcards
+ */
+export function escapeRegex(original: string, preserveWildcards: boolean) {
 	return original
 		.replace(/([\^$\-\\.(){}[\]+])/g, '\\$1') // add slashes for regex characters
-		.replace(/\*/g, '.*') // * -> .*
-		.replace(/\?/g, '.'); // ? -> .
+		.replace(/\*/g, preserveWildcards ? '.*' : '\\*') // * -> .*
+		.replace(/\?/g, preserveWildcards ? '.'  : '\\.'); // ? -> .
 }
 
-export function makeRegexWildcard(original: string) {
+/**
+ * Unescapes backslash-escaped special regex characters.
+ *
+ * @param original the escaped regex string
+ * @param unescapeToWildcards map ".*" to "*"  and "." to "?".
+ */
+export function unescapeRegex(original: string, unescapeToWildcards: boolean) {
 	return original
-	.replace(/\\([\^$\-\\(){}[\]+])/g, '$1') // remove most slashes
-	.replace(/\\\./g, '_ESC_PERIOD_') // escape \.
-	.replace(/\.\*/g, '*') // restore *
-	.replace(/\./g, '?') // restore ?
+	.replace(/\\([\^$\-(){}[\]+])/g, '$1') // remove most slashes
+	.replace(/[^\\](\.)/g, unescapeToWildcards ? '?' : '.')
+	// escape \. (because we don't want to substitute "\." with "?", and we can't test for preceding characters easily.)
+	.replace(/\\\./g, '_ESC_PERIOD_')
+	.replace(/\.\*/g, unescapeToWildcards ? '*' : '.*') // restore *
+	.replace(/\./g,   unescapeToWildcards ? '?' : '.') // restore ?
 	.replace(/_ESC_PERIOD_/g, '.'); // unescape \. to .
 }
 
 /**
  * Escapes the lucene term. This is done by surrounding it by quotes, unless wildcards (* and ?) should be preserved,
  * in which case characters are escaped on an individual basis.
- * Preserving wildcards is only possible when the string does not contain whitespace, as that is the term delimited and cannot be escaped
- * except by surrounding the term with quotes, which implicitly escapes wildcards.
+ * Preserving wildcards is only possible when the string does not contain whitespace, as that is the term delimiter,
+ * and cannot be escaped except by surrounding the term with quotes, which implicitly escapes wildcards.
  *
  * The resultant string should NOT need to be be surrounded by quotes again.
  */

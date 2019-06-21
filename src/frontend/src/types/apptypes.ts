@@ -32,7 +32,7 @@ export type NormalizedAnnotation = {
 	/** List of annotationIds in the same annotatedField, only present when the field has actual subAnnotations */
 	subAnnotations?: string[];
 	/** Based on the uiType of the original annotion, but select falls back to combobox if not all values are known */
-	uiType: 'select'|'combobox'|'text'|'pos';
+	uiType: 'select'|'combobox'|'text';
 	/** Contains all known values for this field. Undefined if no values known or list was incomplete. */
 	values?: Array<{value: string, label: string, title: string|null}>;
 };
@@ -142,8 +142,6 @@ interface INormalizedIndexOld {
 	documentFormat: string|null;
 	indexProgress: BLTypes.BLIndexProgress|null;
 	tokenCount: number|null;
-
-
 }
 export type NormalizedIndexOld = INormalizedIndexOld & Subtract<BLTypes.BLIndex, INormalizedIndexOld>;
 
@@ -169,23 +167,23 @@ export type NormalizedFormatOld = INormalizedFormatOld & Subtract<BLTypes.BLForm
 // Types used on page
 // ------------------
 
-export type AnnotationValue = {
-	/** Unique id of the annotated field  */
-	// readonly annotatedFieldId: string;
+// export type AnnotationValue = {
+// 	/** Unique id of the annotated field  */
+// 	// readonly annotatedFieldId: string;
 
-	/** Unique ID of the property */
-	readonly id: string;
-	/** Raw value of the property */
-	value: string;
-	/** Should the property match using case sensitivity */
-	case: boolean;
-	/**
-	 * Type of the annotation.
-	 * Some types require special treatment when parsing or serializing from/to cql.
-	 * Always available, but not required to allow committing new values to the store without setting it.
-	 */
-	readonly type?: NormalizedAnnotation['uiType'];
-};
+// 	/** Unique ID of the property */
+// 	readonly id: string;
+// 	/** Raw value of the property */
+// 	value: string;
+// 	/** Should the property match using case sensitivity */
+// 	case: boolean;
+// 	/**
+// 	 * Type of the annotation.
+// 	 * Some types require special treatment when parsing or serializing from/to cql.
+// 	 * Always available, but not required to allow committing new values to the store without setting it.
+// 	 */
+// 	readonly type?: NormalizedAnnotation['uiType'];
+// };
 
 export type FilterValue = {
 	/** Unique id of the metadata field */

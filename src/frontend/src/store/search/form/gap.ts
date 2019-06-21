@@ -3,7 +3,6 @@
  * When the user actually executes the query a snapshot of the state is copied to the query module.
  */
 
-import Vue from 'vue';
 import { getStoreBuilder } from 'vuex-typex';
 import cloneDeep from 'clone-deep';
 

@@ -45,12 +45,12 @@ export default BaseFilter.extend({
 			const resultParts = value
 			.split(/"/)
 			.flatMap((v, i) => {
+				// only remove empty strings here, or our in quote detection won't work
+				// (indices need to be preserved)
 				if (!v) {
 					return [];
 				}
 				const inQuotes = (i % 2) !== 0;
-				const containsWhitespace = v.match(/\s+/);
-
 				return inQuotes ? escapeLucene(v, false) : v.split(/\s+/).filter(s => !!s).map(val => escapeLucene(val, true));
 			});
 

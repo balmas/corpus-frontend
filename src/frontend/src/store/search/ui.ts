@@ -2,6 +2,7 @@
  * Contains flags/switches/filters for different parts of the ui that can be configured
  * We use this to generate customized layouts for specific corpora.
  * Is not fully-featured, and is expanded on an as-needed basis.
+ * Functionality may be moved in/out of this module depending on long-term use.
  *
  * Configure from external javascript through window.vuexModules.ui.getState() and assign things.
  */
@@ -12,7 +13,6 @@ import {getStoreBuilder} from 'vuex-typex';
 import {RootState} from '@/store/search/';
 import * as CorpusStore from '@/store/search/corpus';
 import * as BLTypes from '@/types/blacklabtypes';
-import * as AppTypes from '@/types/apptypes';
 import { mapReduce } from '@/utils';
 import { stripIndent } from 'common-tags';
 

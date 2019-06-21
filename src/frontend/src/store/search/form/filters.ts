@@ -74,8 +74,6 @@ const get = {
 		...group,
 		filters: group.filterIds.map(id => state.filters[id])
 	})), 'filterGroups'),
-
-	filterValue(id: string) { return getState().filters[id]; },
 };
 
 const actions = {
