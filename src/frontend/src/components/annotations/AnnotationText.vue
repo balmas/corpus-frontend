@@ -12,22 +12,12 @@
 					:name="inputId"
 					:placeholder="definition.displayName"
 					:dir="textDirection"
+					:value="value.value"
 
 					@input="e_input({value: $event, caseSensitive})"
-
-					v-model="value"
 				/>
 				<div class="input-group-btn">
-					<a v-if="annotation.uiType === 'pos'"
-						data-toggle="modal"
-						class="btn btn-default"
-
-						:href="`#pos_editor${uid}`"
-					>
-						<span class="fa fa-pencil fa-fw"/>
-					</a>
-
-					<label class="btn btn-default file-input-button" :for="fileInputId" v-if="annotation.uiType !== 'pos'">
+					<label class="btn btn-default file-input-button" :for="fileInputId">
 						<span class="fa fa-upload fa-fw"></span>
 						<input
 							type="file"
@@ -40,17 +30,6 @@
 					</label>
 				</div>
 			</div>
-			<template v-if="annotation.uiType === 'pos'">
-				<PartOfSpeech
-					:id="`pos_editor${uid}`"
-					:annotationId="annotation.id"
-					:annotationDisplayName="annotation.displayName"
-
-					@submit="value = $event.queryString"
-
-					ref="pos"
-				/>
-			</template>
 			<div v-if="annotation.caseSensitive" class="checkbox">
 				<label :for="caseInputId">
 					<input
@@ -58,8 +37,9 @@
 
 						:id="caseInputId"
 						:name="caseInputId"
+						:checked="value.caseSensitive"
 
-						v-model="caseSensitive"
+						@change="e_input({value: value.value, caseSensitive: $event})"
 					>
 					Case&nbsp;and&nbsp;diacritics&nbsp;sensitive
 				</label>
