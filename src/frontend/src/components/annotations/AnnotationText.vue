@@ -39,7 +39,7 @@
 						:name="caseInputId"
 						:checked="value.caseSensitive"
 
-						@change="e_input({value: value.value, caseSensitive: $event})"
+						@change="e_input({value: value.value, caseSensitive: $event.target.checked})"
 					>
 					Case&nbsp;and&nbsp;diacritics&nbsp;sensitive
 				</label>
@@ -150,15 +150,22 @@ export default BaseAnnotationEditor.extend({
 							return undefined;
 						}
 
-						caseSensitive = caseSensitive || isCase(exp.value);
-						value = unescapeRegex(stripCase(exp.value), true);
+						value = exp.value;
+						if (isCase(value)) {
+							value = stripCase(exp.value);
+							caseSensitive = true;
+						}
+						debugger;
+						value = unescapeRegex(value, true);
+						if (value.match(/\s+/)) {
+							value = `"${value}"`;
+						}
 					}
 				}
-				if (value && value.match(/\s+/)) {
-					value = `"${value}"`;
-				}
 
-				values.push(value);
+				if (value) {
+					values.push(value);
+				}
 			}
 
 			return {
