@@ -1,8 +1,8 @@
 <template>
-	<div class="form-group propertyfield" :id="definition.id"> <!-- behaves as .row when in .form-horizontal so .row may be omitted -->
+	<div :title="id" class="form-group propertyfield" :id="definition.id"> <!-- behaves as .row when in .form-horizontal so .row may be omitted -->
+
 		<label :for="inputId" class="col-xs-12 col-md-3" :title="definition.description || undefined">{{definition.displayName}}</label>
 		<div class="col-xs-12 col-md-9">
-
 			<div class="input-group">
 				<input
 					type="text"
@@ -14,7 +14,7 @@
 					:dir="textDirection"
 					:value="value.value"
 
-					@input="e_input({value: $event, caseSensitive: value.caseSensitive})"
+					@input="e_input({value: $event.target.value || '', caseSensitive: value.caseSensitive})"
 				/>
 				<div class="input-group-btn">
 					<label class="btn btn-default file-input-button" :for="fileInputId">
@@ -55,6 +55,7 @@ import { escapeLucene, MapOf, unescapeLucene, escapeRegex, unescapeRegex } from 
 import { FilterValue } from '@/types/apptypes';
 import { AnnotationEditorDefinition } from '../../store/search/form/annotations';
 import { Token, BinaryOp } from '../../utils/cqlparser';
+import { debugLog } from '../../utils/debug';
 
 type Metadata = {
 	caseSensitive: boolean;
@@ -97,35 +98,35 @@ export default BaseAnnotationEditor.extend({
 				return inQuotes ? escapeRegex(v, true) : v.split(/\s+/).filter(s => !!s).map(val => escapeRegex(val, true));
 			});
 
-			return resultParts.length ? resultParts.map(v => caseSensitive ? `(?-i)${v}` : v).map(v => `${this.id}="${v}"`) : null;
-		},
-		stringvalue(): string[] {
-			const {value} = this.value as Value;
+			debugLog('recalculated cql for annotation '+this.id);
 
-			const resultParts = value
-			.split(/"/)
-			.flatMap((v, i) => {
-				if (!v) {
-					return [];
-				}
-				const inQuotes = (i % 2) !== 0;
-				return inQuotes ? v : v.split(/\s+/).filter(s => !!s);
-			});
-
-			return resultParts; // may be empty
+			return resultParts.length ? resultParts.map(v => caseSensitive ? `(?-i)${v}` : v).map(v => `${this.annotationId}="${v}"`) : null;
 		},
+		// stringValue(): string[] {
+		// 	const {value} = this.value as Value;
+
+		// 	const resultParts = value
+		// 	.split(/"/)
+		// 	.flatMap((v, i) => {
+		// 		if (!v) {
+		// 			return [];
+		// 		}
+		// 		const inQuotes = (i % 2) !== 0;
+		// 		return inQuotes ? v : v.split(/\s+/).filter(s => !!s);
+		// 	});
+
+		// 	return resultParts; // may be empty
+		// },
 	},
 	methods: {
 		decodeInitialState(ast: Token[]): Value|undefined {
 			function isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); }
 			function stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
 
-
 			const values: Array<string|null> = [];
 			let caseSensitive = false;
 
-			for (let i = 0; i < ast.length; ++i) {
-				const token = ast[i];
+			for (const token of ast) {
 				if (token.leadingXmlTag || token.trailingXmlTag || token.repeats || token.optional) {
 					return undefined;
 				}
@@ -134,6 +135,7 @@ export default BaseAnnotationEditor.extend({
 
 				const stack = [token.expression];
 				let exp: Token['expression'];
+				// tslint:disable-next-line
 				while (exp = stack.shift()) {
 					if (exp.type === 'binaryOp') {
 						if (exp.operator !== 'AND' && exp.operator !== '&') {
@@ -142,7 +144,7 @@ export default BaseAnnotationEditor.extend({
 						}
 
 						stack.push(exp.left, exp.right);
-					} else if (exp.name === this.id) {
+					} else if (exp.name === this.annotationId) {
 						if (value != null) {
 							// Multiple values for this annotation at the same position
 							return undefined;
@@ -162,7 +164,7 @@ export default BaseAnnotationEditor.extend({
 			return {
 				caseSensitive,
 				value: values.join(' ')
-			}
+			};
 		},
 		onFileChanged(event: Event) {
 			const self = this;
@@ -183,7 +185,7 @@ export default BaseAnnotationEditor.extend({
 				self.e_input({
 					caseSensitive: self.value.caseSensitive,
 					value: '',
-				})
+				});
 			}
 			(event.target as HTMLInputElement).value = '';
 		}

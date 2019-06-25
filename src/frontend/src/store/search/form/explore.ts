@@ -46,7 +46,7 @@ const defaults: ModuleRootState = {
 				ret.push({
 					id: defaults.ngram.groupAnnotationId,
 					cql: null,
-					stringvalue: [],
+					stringValue: [],
 					value: null
 				});
 			}
@@ -105,7 +105,7 @@ const internalActions = {
 			state.ngram.tokens.push({
 				id,
 				cql: null,
-				stringvalue: [],
+				stringValue: [],
 				value: null
 			});
 		}
@@ -116,12 +116,12 @@ const actions = {
 	ngram: {
 		size: b.commit((state, payload: number) => state.ngram.size = Math.min(state.ngram.maxSize, payload), 'ngram_size'),
 		tokenType: b.commit((state, payload: {index: number, id: string}) => {
-			if (payload.index < state.ngram.maxSize) {
+			// if (payload.index < state.ngram.maxSize) {
 				state.ngram.tokens[payload.index].id = payload.id;
 				state.ngram.tokens[payload.index].value = null;
 				state.ngram.tokens[payload.index].cql = null;
 				// keep stringValue, that's how we (attempt to) transfer values from one editor to another.
-			}
+			// }
 		}, 'ngram_type'),
 		tokenValue: b.commit((state, payload: {index: number, value: Partial<RemoveProperties<AnnotationStore.AnnotationEditorInstance, 'id'>>}) => {
 			if (payload.index < state.ngram.maxSize) {

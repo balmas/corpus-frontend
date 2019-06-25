@@ -74,20 +74,22 @@ export type NormalizedMetadataField = {
 	values?: Array<{value: string, label: string, title: string|null}>;
 };
 
+export type NormalizedAnnotationGroup = {
+	annotatedFieldId: string;
+	/**
+	 * Pre-sorted based on the displayOrder of annotations in the parent annotatedField
+	 * NOTE: we do this - blacklab returns them in order of declaration in the indexmetadata file.
+	 */
+	annotationIds: string[];
+	/** Unique within groups with the same annotatedFieldId, treat as a user-friendly name */
+	name: string;
+};
+
 /** Contains information about the internal structure of the index - which fields exist for tokens, which metadata fields exist for documents, etc */
 export type NormalizedIndex = {
 	annotatedFields: { [id: string]: NormalizedAnnotatedField; };
 	/** If no groups are defined by blacklab itself, all annotations of all annotatedFields are placed in generated groups called 'Annotations' */
-	annotationGroups: Array<{
-		annotatedFieldId: string;
-		/**
-		 * Pre-sorted based on the displayOrder of annotations in the parent annotatedField
-		 * NOTE: we do this - blacklab returns them in order of declaration in the indexmetadata file.
-		 */
-		annotationIds: string[];
-		/** Unique within groups with the same annotatedFieldId, treat as a user-friendly name */
-		name: string;
-	}>;
+	annotationGroups: NormalizedAnnotationGroup[];
 	contentViewable: boolean;
 	/** Description of the main index */
 	description: string;

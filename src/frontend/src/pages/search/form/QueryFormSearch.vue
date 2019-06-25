@@ -11,16 +11,17 @@
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='simple'}]" id="simple">
 				<div class="form-group form-group-lg">
 
-					<Component
+					<!-- <Component
 						:is="simpleAnnotationEditor.componentName"
 						:definition="simpleAnnotationEditor"
 						:textDirection="textDirection"
 						:value="simpleAnnotationEditor.value != null ? simpleAnnotationEditor.value : undefined"
+						:initialStringValue="simpleAnnotationEditor.stringValue"
 
-						@change-value="onAnnotationValueChange(simpleAnnotationEditor.id, $event)"
-						@change-cql="onAnnotationCqlChange(simpleAnnotationEditor.id, $event)"
-						@change-string-value="onAnnotationStringValueChange(simpleAnnotationEditor.id, $event)"
-					/>
+						@change-value="onSimpleAnnotationValueChange(simpleAnnotationEditor.id, $event)"
+						@change-cql="onSimpleAnnotationCqlChange(simpleAnnotationEditor.id, $event)"
+						@change-string-value="onSimpleAnnotationStringValueChange(simpleAnnotationEditor.id, $event)"
+					/> -->
 
 					<!-- <label class="control-label"
 						:for="simpleAnnotationEditor.id + '_' + uid"
@@ -73,29 +74,31 @@
 							:key="index"
 							:id="getTabId(tab.name)"
 						>
-							<Component v-for="editor in tab.editors" :key="editor.id"
-								:is="editor.componentName"
-								:definition="editor"
+							<Component v-for="editor in tab.editors" :key="editor.definition.id"
+								:is="editor.definition.componentName"
+								:definition="editor.definition"
 								:textDirection="textDirection"
-								:value="editor.value != null ? editor.value : undefined"
+								:value="editor.values.value != null ? editor.values.value : undefined"
+								:initialStringValue="editor.values.stringValue"
 
-								@change-value="onAnnotationValueChange(editor.id, $event)"
-								@change-cql="onAnnotationCqlChange(editor.id, $event)"
-								@change-string-value="onAnnotationStringValueChange(editor.id, $event)"
+								@change-value="onAnnotationValueChange(editor.definition.id, $event)"
+								@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"
+								@change-string-value="onAnnotationStringValueChange(editor.definition.id, $event)"
 							/>
 						</div>
 					</div>
 				</template>
 				<template v-else>
-					<Component v-for="editor in allEditors" :key="editor.id"
-						:is="editor.componentName"
-						:definition="editor"
+					<Component v-for="editor in allEditors" :key="editor.definition.id"
+						:is="editor.definition.componentName"
+						:definition="editor.definition"
 						:textDirection="textDirection"
-						:value="editor.value != null ? editor.value : undefined"
+						:value="editor.values.value != null ? editor.values.value : undefined"
+						:initialStringValue="editor.values.stringValue"
 
-						@change-value="onAnnotationValueChange(editor.id, $event)"
-						@change-cql="onAnnotationCqlChange(editor.id, $event)"
-						@change-string-value="onAnnotationStringValueChange(editor.id, $event)"
+						@change-value="onAnnotationValueChange(editor.definition.id, $event)"
+						@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"
+						@change-string-value="onAnnotationStringValueChange(editor.definition.id, $event)"
 					/>
 				</template>
 
@@ -170,12 +173,10 @@ import { Option } from '@/components/SelectPicker.vue';
 // @ts-ignore
 import uid from '@/mixins/uid';
 
-
 import { QueryBuilder } from '@/modules/cql_querybuilder';
-
 import { paths } from '@/api';
 import * as AppTypes from '@/types/apptypes';
-
+import { debugLog } from '../../../utils/debug';
 
 export default Vue.extend({
 	mixins: [uid],
@@ -193,7 +194,7 @@ export default Vue.extend({
 			return this.tabs.length > 1;
 		},
 		tabs: PatternStore.get.annotationEditorGroups,
-		allEditors(): AnnotationStore.FullAnnotationEditorInstance[] {
+		allEditors() {
 			const editorDefinitions = AnnotationStore.getState();
 			return this.tabs.flatMap(t => t.editors);
 		},
@@ -277,9 +278,15 @@ export default Vue.extend({
 			el.selectionEnd = el.selectionStart = originalSelectionStart + 1;
 		},
 
-		onAnnotationValueChange(id: string, value: any) { PatternStore.actions.extended.annotationEditorValue({id, value}); },
+		onAnnotationValueChange(id: string, value: any) {
+			debugLog(`New value for ${id} received in QueryFormSearch`, value);
+			PatternStore.actions.extended.annotationEditorValue({id, value});
+		},
 		onAnnotationCqlChange(id: string, cql: null|string|string[]) { PatternStore.actions.extended.annotationEditorCql({id, cql}); },
-		onAnnotationStringValueChange(id: string, stringvalue: string[]) { PatternStore.actions.extended.annotationEditorStringValue({id, stringvalue}); },
+		onAnnotationStringValueChange(id: string, stringValue: string[]) { PatternStore.actions.extended.annotationEditorStringValue({id, stringValue}); },
+
+		onSimpleAnnotationValueChange(value: any) { PatternStore.actions.simple.annotationEditorValue(value); },
+		onSimpleAnnotationCqlChange(id: string, cql: null|string|string[]) { PatternStore.actions.simple.annotationEditorCql(cql); },
 	}
 })
 </script>

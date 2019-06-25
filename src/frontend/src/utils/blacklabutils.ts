@@ -1,13 +1,16 @@
 import {NormalizedIndex, NormalizedAnnotation, NormalizedAnnotatedField, NormalizedMetadataField, NormalizedIndexOld, NormalizedFormatOld} from '@/types/apptypes';
 import * as BLTypes from '@/types/blacklabtypes';
+import { makeMapReducer } from '@/utils';
 
 export function normalizeIndex(blIndex: BLTypes.BLIndexMetadata): NormalizedIndex {
 	function findAnnotationGroup(annotatedFieldId: string, annotationId: string): string|undefined {
 		const groupsForAnnotatedField = blIndex.annotationGroups ? blIndex.annotationGroups[annotatedFieldId] : undefined;
 		if (groupsForAnnotatedField == null) {
-			return undefined;
+			// Default group, only if blacklab does not define any groups itself.
+			return 'Annotations';
 		}
 
+		// Alright, groups are defined, find the correct one, return undefined if this annotation does not belong in any group.
 		const group = groupsForAnnotatedField.find(g => g.annotations.includes(annotationId));
 		return group ? group.name : undefined;
 	}
@@ -99,14 +102,11 @@ export function normalizeIndex(blIndex: BLTypes.BLIndexMetadata): NormalizedInde
 		const annotations: Array<[string, BLTypes.BLAnnotation]> = BLTypes.isAnnotatedFieldV1(f) ? Object.entries(f.properties) : Object.entries(f.annotations);
 		const mainAnnotationId: string = BLTypes.isAnnotatedFieldV1(f) ? f.mainProperty : f.mainAnnotation;
 
-		debugger; // todo kijk hier even of de groups defined zijn?
 		return {
 			annotations:
-				annotations.map(([annotationId, annotation]) => normalizeAnnotation(f.fieldName, mainAnnotationId, annotationId, annotation))
-				.reduce<NormalizedAnnotatedField['annotations']>((acc, annot) => {
-					acc[annot.id] = annot;
-					return acc;
-				}, {}),
+				annotations
+				.map(([annotationId, annotation]) => normalizeAnnotation(f.fieldName, mainAnnotationId, annotationId, annotation))
+				.reduce(makeMapReducer('id'), {}),
 			description: f.description,
 			displayName: f.displayName,
 			displayOrder: (!BLTypes.isAnnotatedFieldV1(f) && f.displayOrder != null) ?
@@ -122,13 +122,10 @@ export function normalizeIndex(blIndex: BLTypes.BLIndexMetadata): NormalizedInde
 			mainAnnotationId,
 		};
 	})
-	.reduce<{[id: string]: NormalizedAnnotatedField}>((acc, field) => {
-		acc[field.id] = field;
-		return acc;
-	}, {});
+	.reduce(makeMapReducer('id'), {});
 	const metadataFieldGroupsNormalized =
-		blIndex.metadataFieldGroups.length > 0 ? blIndex.metadataFieldGroups :
-		[{ name: 'Metadata', fields: Object.keys(blIndex.metadataFields) }];
+	blIndex.metadataFieldGroups.length > 0 ? blIndex.metadataFieldGroups :
+	[{ name: 'Metadata', fields: Object.keys(blIndex.metadataFields) }];
 
 	return {
 		annotatedFields: annotatedFieldsNormalized,

@@ -11,6 +11,7 @@
 				class="form-control"
 
 				:id="inputId"
+				:name="inputId"
 				:placeholder="displayName"
 				:dir="textDirection"
 				:value="value"

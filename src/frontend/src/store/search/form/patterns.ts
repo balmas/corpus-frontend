@@ -74,12 +74,29 @@ const get = {
 	}, 'activeAnnotationEditorMap'),
 	annotationEditorGroups: b.read<Array<{
 		groupId: string;
-		editorIds: string[];
-		editors: AnnotationStore.FullAnnotationEditorInstance[];
-	}>>(state => Object.values(state.extended.editorGroups).map(group => ({
-		...group,
-		editors: group.editorIds.map(id => ({...state.extended.annotationEditors[id], ...AnnotationStore.getState()[id]}))
-	})), 'annotationEditorGroups')
+		editors: Array<{
+			definition: AnnotationStore.AnnotationEditorDefinition;
+			values: AnnotationStore.AnnotationEditorInstance;
+		}>;
+	}>>(state => {
+		const groups = Object.values(state.extended.editorGroups);
+		const editorInstances = state.extended.annotationEditors;
+		const editorDefinitions = AnnotationStore.getState();
+		return groups.map(group => {
+			return {
+				groupId: group.groupId,
+				editors: group.editorIds.map(id => {
+					const values = editorInstances[id];
+					const definition = editorDefinitions[id];
+					return {
+						values,
+						definition
+					};
+				})
+			};
+		});
+	},
+	'annotationEditorGroups')
 };
 
 // const privateActions = {
@@ -97,7 +114,7 @@ const actions = {
 			state.simple = {
 				cql: null,
 				id,
-				stringvalue: [],
+				stringValue: [],
 				value: null,
 			};
 		}, 'annotation_simple_set_id'),
@@ -127,20 +144,20 @@ const actions = {
 			Vue.set<AnnotationEditorInstance>(state.extended.annotationEditors, id, {
 				cql: null,
 				id,
-				stringvalue: [],
+				stringValue: [],
 				value: null
 			});
 		}, 'annotation_init'),
 
-		annotationEditor: b.commit((state, {id, cql, value, stringvalue}: AnnotationEditorInstance) => {
+		annotationEditor: b.commit((state, {id, cql, value, stringValue}: AnnotationEditorInstance) => {
 			const f = state.extended.annotationEditors[id];
 			f.cql = cql || null;
 			f.value = value != null ? value : null;
-			f.stringvalue = stringvalue;
+			f.stringValue = stringValue;
 		}, 'filter'),
 		annotationEditorValue: b.commit((state, {id, value}: Pick<AnnotationEditorInstance, 'id'|'value'>) => state.extended.annotationEditors[id].value = value != null ? value : null, 'annotation_value'),
 		annotationEditorCql: b.commit((state, {id, cql}: Pick<AnnotationEditorInstance, 'id'|'cql'>) => state.extended.annotationEditors[id].cql = cql || null, 'annotation_cql'),
-		annotationEditorStringValue: b.commit((state, {id, stringvalue}: Pick<AnnotationEditorInstance, 'id'|'stringvalue'>) => state.extended.annotationEditors[id].stringvalue = stringvalue, 'annotation_stringvalue'),
+		annotationEditorStringValue: b.commit((state, {id, stringValue}: Pick<AnnotationEditorInstance, 'id'|'stringValue'>) => state.extended.annotationEditors[id].stringValue = stringValue, 'annotation_stringValue'),
 
 		within: b.commit((state, payload: string|null) => state.extended.within = payload, 'extended_within'),
 		splitBatch: b.commit((state, payload: boolean) => state.extended.splitBatch = payload, 'extended_split_batch'),
@@ -148,7 +165,7 @@ const actions = {
 		reset: b.commit(state => {
 			Object.values(state.extended.annotationEditors).forEach(annot => {
 				annot.value = annot.cql = null;
-				annot.stringvalue = [];
+				annot.stringValue = [];
 			});
 			state.extended.within = null;
 			state.extended.splitBatch = false;
@@ -179,13 +196,10 @@ const actions = {
 /** We need to call some function from the module before creating the root store or this module won't be evaluated (e.g. none of this code will run) */
 const init = () => {
 	CorpusStore.get.annotations()
-	.forEach(annot => {
-		debugger;
-		actions.extended.createAnnotationEditorInstance({
-			groupId: annot.groupId,
-			id: annot.id
-		})
-	});
+	.forEach(annot => actions.extended.createAnnotationEditorInstance({
+		groupId: annot.groupId,
+		id: annot.id
+	}));
 
 	actions.simple.annotationEditorId(CorpusStore.get.firstMainAnnotation().id);
 	debugLog('Finished initializing pattern module state shape');

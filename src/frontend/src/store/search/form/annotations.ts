@@ -33,7 +33,7 @@ export type AnnotationEditorInstance = {
 	value: any|null;
 
 	/** TODO: used to transfer state from one instance to another of unknown implementation */
-	stringvalue: string[];
+	stringValue: string[];
 };
 
 export type FullAnnotationEditorInstance = AnnotationEditorDefinition&AnnotationEditorInstance;

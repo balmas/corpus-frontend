@@ -266,7 +266,6 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			return null;
 		}
 
-		debugger;
 		const cql = this._parsedCql;
 		if ( // all tokens need to be very simple [annotation="value"] tokens.
 			!cql ||
@@ -290,7 +289,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			size: cql.tokens.length,
 			tokens: cql.tokens.map(t => ({
 				id: t.expression ? (t.expression as Attribute).name : CorpusModule.get.firstMainAnnotation().id,
-				stringvalue: t.expression ? [unescapeRegex((t.expression as Attribute).value, true)] : [],
+				stringValue: t.expression ? [unescapeRegex((t.expression as Attribute).value, true)] : [],
 				cql: null,
 				value: null
 			})),
@@ -484,7 +483,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			return {
 				cql: null,
 				id,
-				stringvalue: [],
+				stringValue: [],
 				value: undefined
 			};
 		}
@@ -496,6 +495,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 				value: undefined,
 				textDirection: CorpusModule.getState().textDirection,
 				definition: editorDefinition,
+				initialStringValue: []
 			},
 		});
 
@@ -503,14 +503,14 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 		const storeValue: AnnotationModule.AnnotationEditorInstance = {
 			cql: null,
 			id,
-			stringvalue: [],
+			stringValue: [],
 			value: componentValue != null ? componentValue : undefined
 		};
 
 		if (componentValue != null) { // don't overwrite default value
 			Vue.set((vueComponentInstance as any)._props, 'value', componentValue);
 			storeValue.cql = vueComponentInstance.cql;
-			storeValue.stringvalue = vueComponentInstance.stringvalue;
+			// storeValue.stringValue = vueComponentInstance.stringValue;
 		}
 		return storeValue;
 	}
