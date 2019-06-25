@@ -99,6 +99,7 @@ export function normalizeIndex(blIndex: BLTypes.BLIndexMetadata): NormalizedInde
 		const annotations: Array<[string, BLTypes.BLAnnotation]> = BLTypes.isAnnotatedFieldV1(f) ? Object.entries(f.properties) : Object.entries(f.annotations);
 		const mainAnnotationId: string = BLTypes.isAnnotatedFieldV1(f) ? f.mainProperty : f.mainAnnotation;
 
+		debugger; // todo kijk hier even of de groups defined zijn?
 		return {
 			annotations:
 				annotations.map(([annotationId, annotation]) => normalizeAnnotation(f.fieldName, mainAnnotationId, annotationId, annotation))

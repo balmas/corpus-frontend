@@ -179,10 +179,13 @@ const actions = {
 /** We need to call some function from the module before creating the root store or this module won't be evaluated (e.g. none of this code will run) */
 const init = () => {
 	CorpusStore.get.annotations()
-	.forEach(annot => actions.extended.createAnnotationEditorInstance({
-		groupId: annot.groupId,
-		id: annot.id
-	}));
+	.forEach(annot => {
+		debugger;
+		actions.extended.createAnnotationEditorInstance({
+			groupId: annot.groupId,
+			id: annot.id
+		})
+	});
 
 	actions.simple.annotationEditorId(CorpusStore.get.firstMainAnnotation().id);
 	debugLog('Finished initializing pattern module state shape');
