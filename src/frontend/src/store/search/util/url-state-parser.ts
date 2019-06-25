@@ -5,10 +5,10 @@ import memoize from 'memoize-decorator';
 import BaseUrlStateParser from '@/store/util/url-state-parser-base';
 import LuceneQueryParser from 'lucene-query-parser';
 
-import {makeRegexWildcard, mapReduce, MapOf} from '@/utils';
+import { mapReduce, MapOf, unescapeRegex } from '@/utils';
 import parseCql, {Attribute} from '@/utils/cqlparser';
 import parseLucene from '@/utils/luceneparser';
-import {debugLog} from '@/utils/debug';
+import { debugLog } from '@/utils/debug';
 
 import * as CorpusModule from '@/store/search/corpus';
 import * as HistoryModule from '@/store/search/history';
@@ -16,6 +16,7 @@ import * as TagsetModule from '@/store/search/tagset';
 
 // Form
 import * as FilterModule from '@/store/search/form/filters';
+import * as AnnotationModule from '@/store/search/form/annotations';
 import * as InterfaceModule from '@/store/search/form/interface';
 import * as PatternModule from '@/store/search/form/patterns';
 import * as ExploreModule from '@/store/search/form/explore';
@@ -27,9 +28,10 @@ import * as DocResultsModule from '@/store/search/results/docs';
 import * as GlobalResultsModule from '@/store/search/results/global';
 import * as HitResultsModule from '@/store/search/results/hits';
 
-import {FilterValue, AnnotationValue} from '@/types/apptypes';
+import { FilterValue } from '@/types/apptypes';
 
 import BaseFilter from '@/components/filters/Filter';
+import baseAnnotationEditor from '@/components/annotations/Annotation';
 
 /**
  * Decode the current url into a valid page state configuration.
@@ -98,7 +100,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 						textDirection: CorpusModule.getState().textDirection,
 						definition: filter,
 					},
-				}) as any;
+				});
 
 				const componentValue = vueComponentInstance.decodeInitialState(parsedQuery, luceneParsedThing);
 				const storeValue: FilterModule.FilterState = {
@@ -107,7 +109,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 					lucene: null
 				};
 				if (componentValue != null) { // don't overwrite default value
-					Vue.set(vueComponentInstance._props, 'value', componentValue);
+					Vue.set((vueComponentInstance as any)._props, 'value', componentValue);
 					storeValue.summary = vueComponentInstance.luceneQuerySummary;
 					storeValue.lucene = vueComponentInstance.luceneQuery;
 				}
@@ -165,6 +167,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			// Can't parse from url, instead determine the best state based on other parameters.
 			const ui = InterfaceModule.defaults;
 
+
 			// show the pattern view that can hold the query
 			// the other views will have the query placed in it as well (if it fits), but this is more of a courtesy
 			// if no pattern exists, show the simplest search
@@ -173,7 +176,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			let fromPattern = true; // is interface state actually from the pattern, or from the default fallback?
 			if (this.simplePattern && !hasFilters && !hasGapValue) {
 				ui.patternMode = 'simple';
-			} else if ((Object.keys(this.extendedPattern.annotationValues).length > 0) && !hasGapValue) {
+			} else if ((Object.keys(this.extendedPattern.annotationEditors).length > 0) && !hasGapValue) {
 				ui.patternMode = 'extended';
 			} else if (this.advancedPattern && !hasGapValue) {
 				ui.patternMode = 'advanced';
@@ -263,6 +266,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			return null;
 		}
 
+		debugger;
 		const cql = this._parsedCql;
 		if ( // all tokens need to be very simple [annotation="value"] tokens.
 			!cql ||
@@ -286,8 +290,12 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			size: cql.tokens.length,
 			tokens: cql.tokens.map(t => ({
 				id: t.expression ? (t.expression as Attribute).name : CorpusModule.get.firstMainAnnotation().id,
-				value: t.expression ? makeRegexWildcard((t.expression as Attribute).value) : '',
+				stringvalue: t.expression ? [unescapeRegex((t.expression as Attribute).value, true)] : [],
+				cql: null,
+				value: null
 			})),
+
+			// tokens: cql.tokens.map()
 		};
 	}
 
@@ -325,151 +333,209 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 		return this.getNumber('number', GlobalResultsModule.defaults.pageSize, v => [20,50,100,200].includes(v) ? v : GlobalResultsModule.defaults.pageSize)!;
 	}
 
-	@memoize
-	private get annotationValues(): {[key: string]: AnnotationValue} {
-		function isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); }
-		function stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
+	// @memoize
+	// private get annotationValues(): {[key: string]: AnnotationValue} {
+	// 	function isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); }
+	// 	function stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
 
-		// How we parse the cql pattern depends on whether a tagset is available for this corpus, and whether it's enabled in the ui
-		if (!(TagsetModule.getState().state === 'loaded' || TagsetModule.getState().state === 'disabled')) {
-			throw new Error('Attempting to parse url before tagset is loaded or disabled, await tagset.awaitInit() before parsing url.');
+	// 	// How we parse the cql pattern depends on whether a tagset is available for this corpus, and whether it's enabled in the ui
+	// 	if (!(TagsetModule.getState().state === 'loaded' || TagsetModule.getState().state === 'disabled')) {
+	// 		throw new Error('Attempting to parse url before tagset is loaded or disabled, await tagset.awaitInit() before parsing url.');
+	// 	}
+
+	// 	const result = this._parsedCql;
+	// 	if (result == null) {
+	// 		return {};
+	// 	}
+
+	// 	const tagsetInfo = TagsetModule.getState().state === 'loaded' ? {
+	// 		mainAnnotations: CorpusModule.get.annotations().filter(a => a.uiType === 'pos').map(a => a.id),
+	// 		subAnnotations: Object.keys(TagsetModule.getState().subAnnotations)
+	// 	} : null;
+
+	// 	try {
+	// 		/**
+	// 		 * A requirement of the PropertyFields is that there are no gaps in the values
+	// 		 * So a valid config is
+	// 		 * ```
+	// 		 * lemma: [these, are, words]
+	// 		 * word: [these, are, other, words]
+	// 		 * ```
+	// 		 * And an invalid config is
+	// 		 * ```
+	// 		 * lemma: [gaps, are, , not, allowed]
+	// 		 * ```
+	// 		 * Not all properties need to have the same number of values though,
+	// 		 * shorter lists are implicitly treated as having wildcards for the remainder of values. (see getPatternString())
+	// 		 *
+	// 		 * Store the values here while parsing.
+	// 		 */
+	// 		const knownAnnotations = CorpusModule.get.annotationDisplayNames();
+
+	// 		const annotationValues: {[key: string]: string[]} = {};
+	// 		for (let i = 0; i < result.tokens.length; ++i) {
+	// 			const token = result.tokens[i];
+	// 			if (token.leadingXmlTag || token.optional || token.repeats || token.trailingXmlTag) {
+	// 				throw new Error('Token contains settings too complex for simple search');
+	// 			}
+
+	// 			// Use a stack instead of direct recursion to simplify code
+	// 			const stack = token.expression ? [token.expression] : [];
+	// 			while (stack.length) {
+	// 				const expr = stack.shift()!;
+	// 				if (expr.type === 'attribute') {
+	// 					const name = expr.name;
+	// 					if (knownAnnotations[name] == null) {
+	// 						debugLog(`Encountered unknown cql field ${name} while decoding query from url, ignoring.`);
+	// 						continue;
+	// 					}
+
+	// 					const isMainTagsetAnnotation = tagsetInfo && tagsetInfo.mainAnnotations.includes(name);
+	// 					const isTagsetAnnotation = isMainTagsetAnnotation || (tagsetInfo && tagsetInfo.subAnnotations.includes(name));
+
+	// 					if (isTagsetAnnotation) {
+	// 						// add value as original cql-query substring to the main tagset annotation under which the values should be stored.
+	// 						debugLog('Relocating value for annotation ' + name + ' to tagset annotation(s) ' + tagsetInfo!.mainAnnotations);
+	// 						const originalValue = `${name}="${expr.value}"`;
+
+	// 						for (const id of tagsetInfo!.mainAnnotations) {
+	// 							const valuesForAnnotation = annotationValues[id] = annotationValues[id] || [];
+	// 							// keep main annotation at the start
+	// 							isMainTagsetAnnotation ? valuesForAnnotation.unshift(originalValue) : valuesForAnnotation.push(originalValue);
+	// 						}
+	// 					} else {
+	// 						// otherwise just store wherever it should be in the store.
+	// 						const values = annotationValues[name] = annotationValues[name] || [];
+	// 						if (expr.operator !== '=') {
+	// 							throw new Error(`Unsupported comparator for property ${name} on token ${i} for query ${this.expertPattern}, only "=" is supported.`);
+	// 						}
+	// 						if (values.length !== i) {
+	// 							throw new Error(`Property ${name} contains gaps in value for query ${this.expertPattern}`);
+	// 						}
+	// 						values.push(expr.value);
+	// 					}
+
+	// 				} else if (expr.type === 'binaryOp') {
+	// 					if (!(expr.operator === '&' || expr.operator === 'AND')) {
+	// 						throw new Error(`Properties on token ${i} are combined using unsupported operator ${expr.operator} in query ${this.expertPattern}, only AND/& operator is supported.`);
+	// 					}
+
+	// 					stack.push(expr.left, expr.right);
+	// 				}
+	// 			}
+	// 		}
+
+	// 		/**
+	// 		 * Build the actual PropertyFields.
+	// 		 * Convert from regex back into pattern globs, extract case sensitivity.
+	// 		 */
+	// 		return Object.entries(annotationValues).map<AnnotationValue>(([id, values]) => {
+	// 			if (tagsetInfo && tagsetInfo.mainAnnotations.includes(id)) {
+	// 				// use value as-is, already contains cql and should not have wildcards substituted.
+	// 				debugLog('Mapping tagset annotation back to cql: ' + id + ' with values ' + values);
+
+	// 				return {
+	// 					id,
+	// 					case: false,
+	// 					value: values.join('&'),
+	// 				};
+	// 			}
+
+	// 			const caseSensitive = values.every(isCase);
+	// 			if (caseSensitive) {
+	// 				values = values.map(stripCase);
+	// 			}
+	// 			return {
+	// 				id,
+	// 				case: caseSensitive,
+	// 				value: makeRegexWildcard(values.join(' '))
+	// 			} as AnnotationValue;
+	// 		})
+	// 		.reduce((acc, v) => {acc[v.id] = v; return acc;}, {} as {[key: string]: AnnotationValue});
+	// 	} catch (error) {
+	// 		debugLog('Cql query could not be placed in extended view', error);
+	// 		return {};
+	// 	}
+	// }
+
+	// @memoize
+	// private get simplePattern(): string|null {
+	// 	// Simple view is just a subset of extended view
+	// 	// So we can just check if extended fits into simple
+	// 	// then we get wildcard conversion etc for free.
+	// 	// (simple/extended view have their values processed when converting to query - see utils::getPatternString,
+	// 	// and this needs to be undone too)
+	// 	const extended = this.extendedPattern;
+	// 	const vals = Object.values(this.extendedPattern.annotationValues);
+	// 	if (extended.within == null && vals.length === 1 && vals[0].id === CorpusModule.get.firstMainAnnotation().id && !vals[0].case) {
+	// 		return vals[0].value;
+	// 	}
+
+	// 	return null;
+	// }
+
+	private _annotationValue(editorDefinition: AnnotationModule.AnnotationEditorDefinition): AnnotationModule.AnnotationEditorInstance {
+		const {componentName, id} = editorDefinition;
+		const vueComponent = Vue.component(componentName) as typeof baseAnnotationEditor;
+
+		if (!vueComponent) {
+			// tslint:disable-next-line
+			console.warn(`Simple annotation ${id} defines its vue component as ${componentName} but it does not exist! (have you registered it properly with vue?)`);
+			return {
+				cql: null,
+				id,
+				stringvalue: [],
+				value: undefined
+			};
 		}
 
-		const result = this._parsedCql;
-		if (result == null) {
-			return {};
+		const vueComponentInstance = new vueComponent({
+			propsData: {
+				// don't set a null value, allow the component to set this prop's default value (if configured).
+				// or it may throw errors when running computed methods.
+				value: undefined,
+				textDirection: CorpusModule.getState().textDirection,
+				definition: editorDefinition,
+			},
+		});
+
+		const componentValue = this._parsedCql ? vueComponentInstance.decodeInitialState(this._parsedCql!.tokens) : null;
+		const storeValue: AnnotationModule.AnnotationEditorInstance = {
+			cql: null,
+			id,
+			stringvalue: [],
+			value: componentValue != null ? componentValue : undefined
+		};
+
+		if (componentValue != null) { // don't overwrite default value
+			Vue.set((vueComponentInstance as any)._props, 'value', componentValue);
+			storeValue.cql = vueComponentInstance.cql;
+			storeValue.stringvalue = vueComponentInstance.stringvalue;
 		}
-
-		const tagsetInfo = TagsetModule.getState().state === 'loaded' ? {
-			mainAnnotations: CorpusModule.get.annotations().filter(a => a.uiType === 'pos').map(a => a.id),
-			subAnnotations: Object.keys(TagsetModule.getState().subAnnotations)
-		} : null;
-
-		try {
-			/**
-			 * A requirement of the PropertyFields is that there are no gaps in the values
-			 * So a valid config is
-			 * ```
-			 * lemma: [these, are, words]
-			 * word: [these, are, other, words]
-			 * ```
-			 * And an invalid config is
-			 * ```
-			 * lemma: [gaps, are, , not, allowed]
-			 * ```
-			 * Not all properties need to have the same number of values though,
-			 * shorter lists are implicitly treated as having wildcards for the remainder of values. (see getPatternString())
-			 *
-			 * Store the values here while parsing.
-			 */
-			const knownAnnotations = CorpusModule.get.annotationDisplayNames();
-
-			const annotationValues: {[key: string]: string[]} = {};
-			for (let i = 0; i < result.tokens.length; ++i) {
-				const token = result.tokens[i];
-				if (token.leadingXmlTag || token.optional || token.repeats || token.trailingXmlTag) {
-					throw new Error('Token contains settings too complex for simple search');
-				}
-
-				// Use a stack instead of direct recursion to simplify code
-				const stack = token.expression ? [token.expression] : [];
-				while (stack.length) {
-					const expr = stack.shift()!;
-					if (expr.type === 'attribute') {
-						const name = expr.name;
-						if (knownAnnotations[name] == null) {
-							debugLog(`Encountered unknown cql field ${name} while decoding query from url, ignoring.`);
-							continue;
-						}
-
-						const isMainTagsetAnnotation = tagsetInfo && tagsetInfo.mainAnnotations.includes(name);
-						const isTagsetAnnotation = isMainTagsetAnnotation || (tagsetInfo && tagsetInfo.subAnnotations.includes(name));
-
-						if (isTagsetAnnotation) {
-							// add value as original cql-query substring to the main tagset annotation under which the values should be stored.
-							debugLog('Relocating value for annotation ' + name + ' to tagset annotation(s) ' + tagsetInfo!.mainAnnotations);
-							const originalValue = `${name}="${expr.value}"`;
-
-							for (const id of tagsetInfo!.mainAnnotations) {
-								const valuesForAnnotation = annotationValues[id] = annotationValues[id] || [];
-								// keep main annotation at the start
-								isMainTagsetAnnotation ? valuesForAnnotation.unshift(originalValue) : valuesForAnnotation.push(originalValue);
-							}
-						} else {
-							// otherwise just store wherever it should be in the store.
-							const values = annotationValues[name] = annotationValues[name] || [];
-							if (expr.operator !== '=') {
-								throw new Error(`Unsupported comparator for property ${name} on token ${i} for query ${this.expertPattern}, only "=" is supported.`);
-							}
-							if (values.length !== i) {
-								throw new Error(`Property ${name} contains gaps in value for query ${this.expertPattern}`);
-							}
-							values.push(expr.value);
-						}
-
-					} else if (expr.type === 'binaryOp') {
-						if (!(expr.operator === '&' || expr.operator === 'AND')) {
-							throw new Error(`Properties on token ${i} are combined using unsupported operator ${expr.operator} in query ${this.expertPattern}, only AND/& operator is supported.`);
-						}
-
-						stack.push(expr.left, expr.right);
-					}
-				}
-			}
-
-			/**
-			 * Build the actual PropertyFields.
-			 * Convert from regex back into pattern globs, extract case sensitivity.
-			 */
-			return Object.entries(annotationValues).map<AnnotationValue>(([id, values]) => {
-				if (tagsetInfo && tagsetInfo.mainAnnotations.includes(id)) {
-					// use value as-is, already contains cql and should not have wildcards substituted.
-					debugLog('Mapping tagset annotation back to cql: ' + id + ' with values ' + values);
-
-					return {
-						id,
-						case: false,
-						value: values.join('&'),
-					};
-				}
-
-				const caseSensitive = values.every(isCase);
-				if (caseSensitive) {
-					values = values.map(stripCase);
-				}
-				return {
-					id,
-					case: caseSensitive,
-					value: makeRegexWildcard(values.join(' '))
-				} as AnnotationValue;
-			})
-			.reduce((acc, v) => {acc[v.id] = v; return acc;}, {} as {[key: string]: AnnotationValue});
-		} catch (error) {
-			debugLog('Cql query could not be placed in extended view', error);
-			return {};
-		}
+		return storeValue;
 	}
 
 	@memoize
-	private get simplePattern(): string|null {
-		// Simple view is just a subset of extended view
-		// So we can just check if extended fits into simple
-		// then we get wildcard conversion etc for free.
-		// (simple/extended view have their values processed when converting to query - see utils::getPatternString,
-		// and this needs to be undone too)
-		const extended = this.extendedPattern;
-		const vals = Object.values(this.extendedPattern.annotationValues);
-		if (extended.within == null && vals.length === 1 && vals[0].id === CorpusModule.get.firstMainAnnotation().id && !vals[0].case) {
-			return vals[0].value;
-		}
+	private get annotationValues(): MapOf<AnnotationModule.AnnotationEditorInstance> {
+		const editors: MapOf<AnnotationModule.AnnotationEditorInstance> = PatternModule.getState().extended.annotationEditors;
+		const editorDefinitions: AnnotationModule.AnnotationEditorDefinition[] = Object.keys(editors).map(id => AnnotationModule.getState()[id]);
 
-		return null;
+		// Remove editors without a value in them
+		return mapReduce(editorDefinitions.map(def => this._annotationValue(def)).filter(value => !!value.cql), 'id');
 	}
 
 	@memoize
-	private get extendedPattern() {
+	private get simplePattern(): AnnotationModule.AnnotationEditorInstance {
+		const editorId = PatternModule.getState().simple!.id;
+		const editorDefinition = AnnotationModule.getState()[editorId];
+
+		return this._annotationValue(editorDefinition);
+	}
+
+	@memoize
+	private get extendedPattern(): PatternModule.ModuleRootState['extended'] {
 		return {
-			annotationValues: this.annotationValues,
+			annotationEditors: this.annotationValues,
 			within: this.within,
 			// This is always false, it's just a checkbox that will split up the query when it's submitted, then untick itself
 			splitBatch: false

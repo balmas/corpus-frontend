@@ -220,70 +220,72 @@ const actions = {
 	 * Then the first query in the list is submitted, and the rest is pushed into the history so the user can load them at a later moment.
 	 */
 	searchSplitBatches: b.commit(state => {
-		if (state.interface.form !== 'search' || state.interface.patternMode !== 'extended' || !state.patterns.extended.splitBatch) {
-			throw new Error('Attempting to submit split batches in wrong view');
-		}
 
-		const sharedBatchState: Pick<HistoryModule.HistoryEntry, Exclude<keyof HistoryModule.HistoryEntry, 'patterns'>> = {
-			docs: DocResultsModule.defaults,
-			explore: ExploreModule.defaults,
-			global: GlobalResultsModule.getState(),
-			hits: HitResultsModule.defaults,
-			interface: InterfaceModule.getState(),
-			filters: get.filtersActive() ? FilterModule.get.activeFiltersMap() : {},
-			gap: get.gapFillingActive() ? GapModule.getState() : GapModule.defaults,
-		};
+		alert('todo - split batch implementation')
+		// if (state.interface.form !== 'search' || state.interface.patternMode !== 'extended' || !state.patterns.extended.splitBatch) {
+		// 	throw new Error('Attempting to submit split batches in wrong view');
+		// }
 
-		const annotations = PatternModule.get.activeAnnotations();
-		const submittedFormStates = annotations
-		.filter(a => a.type !== 'pos')
-		.flatMap(a => {
-			return a.value
-			.split('|')
-			.map(value => ({
-				...a,
-				value
-			}));
-		})
-		.map<{
-			entry: HistoryModule.HistoryEntry,
-			pattern?: string,
-			url: string
-		}>(a => ({
-			entry: {
-				...sharedBatchState,
-				patterns: {
-					advanced: null,
-					expert: null,
-					simple: null,
-					extended: {
-						annotationValues: {
-							[a.id]: a
-						},
-						splitBatch: false,
-						within: state.patterns.extended.within
-					}
-				}
-			},
-			pattern: getPatternString([a], state.patterns.extended.within),
-			// TODO :( url generation is too encapsulated to completely repro here
-			url: ''
-		}))
-		// remove vuex listeners from aliased parts of the store.
-		.map(v => cloneDeep(v));
+		// const sharedBatchState: Pick<HistoryModule.HistoryEntry, Exclude<keyof HistoryModule.HistoryEntry, 'patterns'>> = {
+		// 	docs: DocResultsModule.defaults,
+		// 	explore: ExploreModule.defaults,
+		// 	global: GlobalResultsModule.getState(),
+		// 	hits: HitResultsModule.defaults,
+		// 	interface: InterfaceModule.getState(),
+		// 	filters: get.filtersActive() ? FilterModule.get.activeFiltersMap() : {},
+		// 	gap: get.gapFillingActive() ? GapModule.getState() : GapModule.defaults,
+		// };
 
-		// We can't just run a submit for every subquery, as that would be REALLY slow.
-		// Even if it were fast, mutations within a single vue frame are debounced,
-		// so listeners won't be called for any update except the last,
-		// preventing the history entries from being created.
-		// Unfortunately we need to copy the history entry generation code :(
-		// See streams.ts
+		// const annotations = PatternModule.get.activeAnnotations();
+		// const submittedFormStates = annotations
+		// .filter(a => a.type !== 'pos')
+		// .flatMap(a => {
+		// 	return a.value
+		// 	.split('|')
+		// 	.map(value => ({
+		// 		...a,
+		// 		value
+		// 	}));
+		// })
+		// .map<{
+		// 	entry: HistoryModule.HistoryEntry,
+		// 	pattern?: string,
+		// 	url: string
+		// }>(a => ({
+		// 	entry: {
+		// 		...sharedBatchState,
+		// 		patterns: {
+		// 			advanced: null,
+		// 			expert: null,
+		// 			simple: null,
+		// 			extended: {
+		// 				annotationValues: {
+		// 					[a.id]: a
+		// 				},
+		// 				splitBatch: false,
+		// 				within: state.patterns.extended.within
+		// 			}
+		// 		}
+		// 	},
+		// 	pattern: getPatternString([a], state.patterns.extended.within),
+		// 	// TODO :( url generation is too encapsulated to completely repro here
+		// 	url: ''
+		// }))
+		// // remove vuex listeners from aliased parts of the store.
+		// .map(v => cloneDeep(v));
 
-		submittedFormStates.forEach(HistoryModule.actions.addEntry);
-		const mostRecent = HistoryModule.getState()[0];
-		if (mostRecent) {
-			actions.replace(mostRecent);
-		}
+		// // We can't just run a submit for every subquery, as that would be REALLY slow.
+		// // Even if it were fast, mutations within a single vue frame are debounced,
+		// // so listeners won't be called for any update except the last,
+		// // preventing the history entries from being created.
+		// // Unfortunately we need to copy the history entry generation code :(
+		// // See streams.ts
+
+		// submittedFormStates.forEach(HistoryModule.actions.addEntry);
+		// const mostRecent = HistoryModule.getState()[0];
+		// if (mostRecent) {
+		// 	actions.replace(mostRecent);
+		// }
 	}, 'searchSplitBatches'),
 
 	reset: b.commit(state => {

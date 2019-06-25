@@ -8,16 +8,17 @@ import cloneDeep from 'clone-deep';
 import {RootState} from '@/store/search/';
 import * as CorpusStore from '@/store/search/corpus'; // Is initialized before we are.
 import * as UIStore from '@/store/search/ui'; // Is initialized before we are.
-import {makeWildcardRegex} from '@/utils';
-import {AnnotationValue} from '@/types/apptypes';
+import * as AnnotationStore from '@/store/search/form/annotations';
+import { RemoveProperties } from '@/types/helpers';
+// import {AnnotationValue} from '@/types/apptypes';
 
-type Token = Pick<AnnotationValue, Exclude<keyof AnnotationValue, 'annotatedFieldId'|'case'>>;
+// type Token = AnnotationEditorInstance;
 
 type ModuleRootState = {
 	ngram: {
 		maxSize: number;
 		size: number;
-		tokens: Token[];
+		tokens: AnnotationStore.AnnotationEditorInstance[];
 		groupAnnotationId: string;
 	};
 
@@ -44,8 +45,9 @@ const defaults: ModuleRootState = {
 			for (let i = 0; i < defaults.ngram.maxSize; ++i) {
 				ret.push({
 					id: defaults.ngram.groupAnnotationId,
-					type: 'text', // doesn't matter here
-					value: ''
+					cql: null,
+					stringvalue: [],
+					value: null
 				});
 			}
 			return ret;
@@ -72,13 +74,13 @@ const get = {
 	ngram: {
 		size: b.read(state => state.ngram.size, 'ngram_size'),
 		maxSize: b.read(state => state.ngram.maxSize, 'ngram_maxSize'),
-		tokens: b.read(state => state.ngram.tokens, 'ngram_tokens'),
+		tokens: b.read(state => state.ngram.tokens.map(t => ({...t, ...AnnotationStore.getState()[t.id]})), 'ngram_tokens'),
 		groupAnnotationId: b.read(state => state.ngram.groupAnnotationId, 'ngram_groupAnnotationId'),
 
 		groupBy: b.read(state => `hit:${state.ngram.groupAnnotationId}`, 'ngram_groupBy'),
 		patternString: b.read(state => state.ngram.tokens
 			.slice(0, state.ngram.size)
-			.map(({id, value}) => value ? `[${id}="${makeWildcardRegex(value)}"]` : '[]')
+			.map(v => `[${Array.isArray(v.cql) ? v.cql.join(' | ') : v.cql || ''}]`)
 			.join('')
 		, 'ngram_patternString')
 	},
@@ -102,7 +104,9 @@ const internalActions = {
 		while (state.ngram.tokens.length < state.ngram.maxSize) {
 			state.ngram.tokens.push({
 				id,
-				value: '',
+				cql: null,
+				stringvalue: [],
+				value: null
 			});
 		}
 	}, 'fixTokenArray')
@@ -111,11 +115,26 @@ const internalActions = {
 const actions = {
 	ngram: {
 		size: b.commit((state, payload: number) => state.ngram.size = Math.min(state.ngram.maxSize, payload), 'ngram_size'),
-		token: b.commit((state, payload: { index: number, token: Partial<Token> }) => {
+		tokenType: b.commit((state, payload: {index: number, id: string}) => {
 			if (payload.index < state.ngram.maxSize) {
-				Object.assign(state.ngram.tokens[payload.index], payload.token);
+				state.ngram.tokens[payload.index].id = payload.id;
+				state.ngram.tokens[payload.index].value = null;
+				state.ngram.tokens[payload.index].cql = null;
+				// keep stringValue, that's how we (attempt to) transfer values from one editor to another.
 			}
-		}, 'ngram_token'),
+		}, 'ngram_type'),
+		tokenValue: b.commit((state, payload: {index: number, value: Partial<RemoveProperties<AnnotationStore.AnnotationEditorInstance, 'id'>>}) => {
+			if (payload.index < state.ngram.maxSize) {
+				Object.assign(state.ngram.tokens[payload.index], payload.value);
+			}
+		}, 'ngram_value'),
+		// tokenCql: b.commit((state, payload: { index: number, cql: string|string[] }) => {
+		// 	if (payload.index < state.ngram.maxSize) {
+		// 		state.ngram.tokens[payload.index].cql = payload.cql;
+		// 	}
+		// }, 'ngram_cql'),
+		// tokenStringValue: b.commit((state, payload: {index: number, stringValue}))
+
 		groupAnnotationId: b.commit((state, payload: string) => state.ngram.groupAnnotationId = payload, 'ngram_groupAnnotationId'),
 		maxSize: b.commit((state, payload: number) => {
 			state.ngram.size = Math.min(state.ngram.size, payload);
@@ -160,7 +179,6 @@ const init = () => {
 
 export {
 	ModuleRootState,
-	Token,
 
 	getState,
 	get,

@@ -3,6 +3,7 @@ import Vue from 'vue';
 // just for whatever metadata might be needed here.
 import { FilterValue, FilterDefinition } from '@/types/apptypes';
 import { MapOf } from '@/utils';
+import { ASTNode } from 'lucene-query-parser';
 
 const baseFilter = Vue.extend({
 	props: {
@@ -27,10 +28,10 @@ const baseFilter = Vue.extend({
 		/**
 		 * Called on first load, convert the initial query to a valid state for the value prop,
 		 * what this looks like is up to the implementation.
-		 * When this is called the component will not be mounted, though all props with exception of value will be available.
-		 * If the query could not be decoded, the default empty value state should be returned.
+		 * When this is called the component will not have been mounted, though all props with exception of value will be available.
+		 * If the query could not be decoded, null should be returned.
 		 */
-		decodeInitialState(filterValues: MapOf<FilterValue>): any { throw new Error('missing decodeInitialState() implementation in filter'); }
+		decodeInitialState(filterValues: MapOf<FilterValue>, ast: ASTNode): any { throw new Error('missing decodeInitialState() implementation in filter'); }
 	},
 	computed: {
 		id(): string { return this.definition.id; },

@@ -33,7 +33,7 @@ export function normalizeIndex(blIndex: BLTypes.BLIndexMetadata): NormalizedInde
 		switch (uiType) {
 			case 'select': return field.values && field.valueListComplete ? 'select' : 'combobox';
 			case 'combobox':
-			case 'pos':
+			// case 'pos':
 				return uiType;
 			default: return 'text';
 		}

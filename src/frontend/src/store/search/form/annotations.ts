@@ -19,7 +19,8 @@ import { RemoveProperties } from '@/types/helpers';
 
 export type AnnotationEditorDefinition = RemoveProperties<FilterDefinition, 'groupId'>;
 
-export type AnnotationEditorValue = {
+export type AnnotationEditorInstance = {
+	id: string;
 	/**
 	 * Single string === use for every position in the query,
 	 * string[] === split values over multiple tokens based on index.
@@ -34,6 +35,8 @@ export type AnnotationEditorValue = {
 	/** TODO: used to transfer state from one instance to another of unknown implementation */
 	stringvalue: string[];
 };
+
+export type FullAnnotationEditorInstance = AnnotationEditorDefinition&AnnotationEditorInstance;
 
 // export type FullAnnotationState = FilterDefinition&AnnotationEditorValue;
 
@@ -85,13 +88,13 @@ const actions = {
 	// }, 'registerFilterGroup'),
 
 	registerAnnotationEditor: b.commit((state, annot: AnnotationEditorDefinition) => {
-		if (annot.id in state.filters) {
+		if (annot.id in state) {
 			// tslint:disable-next-line
 			console.warn(`Annotation ${annot.id} already exists`);
 			return;
 		}
 
-		Vue.set<AnnotationEditorDefinition>(state.filters, annot.id, cloneDeep(annot));
+		Vue.set<AnnotationEditorDefinition>(state, annot.id, cloneDeep(annot));
 	}, 'registerAnnotationEditor'),
 
 	// filter: b.commit((state, {id, lucene, value, summary}: Pick<FullFilterState, 'id'|'lucene'|'value'|'summary'>) => {
@@ -118,18 +121,20 @@ const init = () => {
 		let componentName;
 		let metadata: any;
 		switch (annot.uiType) {
-			case 'combobox':
-				componentName = 'annotation-autocomplete';
-				metadata = paths.autocompleteAnnotation(CorpusModule.getState().id, annot.annotatedFieldId, annot.id);
-				break;
-			case 'select'  :
-				componentName = 'annotation-select';
-				metadata = annot.values || [];
-				break;
+			// case 'combobox':
+			// 	componentName = 'annotation-autocomplete';
+			// 	metadata = paths.autocompleteAnnotation(CorpusModule.getState().id, annot.annotatedFieldId, annot.id);
+			// 	break;
+			// case 'select'  :
+			// 	componentName = 'annotation-select';
+			// 	metadata = annot.values || [];
+			// 	break;
 			case 'text'    :
 			default        :
 				componentName = 'annotation-text';
-				metadata = undefined;
+				metadata = {
+					caseSensitive: annot.caseSensitive
+				};
 				break;
 		}
 
@@ -142,7 +147,7 @@ const init = () => {
 		});
 	});
 
-	debugLog('Finished initializing filter module state shape');
+	debugLog('Finished initializing annotation module state shape');
 };
 
 export {

@@ -3,6 +3,7 @@ import URI from 'urijs';
 import * as BLTypes from '@/types/blacklabtypes';
 import * as AppTypes from '@/types/apptypes';
 import { FilterState, FullFilterState } from '@/store/search/form/filters';
+import { AnnotationEditorInstance } from '@/store/search/form/annotations';
 
 /**
  * Escapes the regex term. This is done by escaping all special characters on an individual basis.
@@ -195,40 +196,73 @@ export const getFilterSummaryOld = (filters: AppTypes.FilterValue[]) => filters
 	.map(({id, type, values}) =>
 		`${id} = [${type==='range'?`${values[0] || '0'} to ${values[1] || '9999'}`:values.join(', ')}]`).join(', ');
 
-export const getPatternString = (annotations: AppTypes.AnnotationValue[], within: null|string) => {
-	const tokens = [] as string[][];
+export const getPatternString = (annotationEditors: AnnotationEditorInstance[], within: string|null): string|undefined => {
+	// Sort the annotations! We must produce stable queries or they can't be compared! Required for query history/url change detection and such.
+	annotationEditors = annotationEditors.filter(ed => ed.cql != null && ed.cql.length).sort((a, b) => a.id.localeCompare(b.id));
 
-	annotations.forEach(({id, case: caseSensitive, value, type}) => {
-		switch (type) {
-			case 'pos': {
-				const arr = (tokens[0] = tokens[0] || []);
-				arr.push(value); // already valid cql, no escaping or wildcard substitution.
-				return;
-			}
-			case 'select':
-			case 'text':
-			case 'combobox': {
-				value
-				.replace(/"/g, '')
-				.trim()
-				.split(/\s+/)
-				.filter(v => !!v)
-				.forEach((word, i) => {
-					const arr = (tokens[i] = tokens[i] || []);
-					arr.push(`${id}="${(caseSensitive ? '(?-i)' : '') + makeWildcardRegex(word)}"`);
-				});
-				return;
-			}
-			default: throw new Error('Unimplemented cql serialization for annotation type ' + type);
+	/** A token is just a collection of cql snippets, so a string[]. There might be multiple tokens, so string[][] */
+	const tokenArray: string[][] = [];
+	/**
+	 * Some editors only produce one value, in that case, that value should be used in every token.
+	 * Store these values here until we have processed all other values, so we know how many tokens there are.
+	 */
+	const valuesForEveryToken: string[] = [];
+
+	// gather all the values into tokens
+	annotationEditors.forEach(ed => {
+		if (Array.isArray(ed.cql)) {
+			ed.cql.forEach((value, index) => {
+				const token = tokenArray[index] = (tokenArray[index] || []);
+				token.push(value);
+			});
+		} else if (typeof ed.cql === 'string') {
+			valuesForEveryToken.push(ed.cql);
+		} else {
+			// Should never happen
+			throw new Error('Unexpected annotation value, not string or string[]');
 		}
 	});
 
-	let query = tokens.map(t => `[${t.join('&')}]`).join('');
-	if (query.length > 0 && within) {
-		query += ` within <${within}/>`;
-	}
-	return query || undefined;
+	tokenArray.forEach(tokenValues => tokenValues.push(...valuesForEveryToken));
+
+	const query = tokenArray.map(token => `[${token.join(' & ')}]`).join('');
+	return query ? within ? query + ` within <${within}/>` : query : undefined;
 };
+
+// export const getPatternString = (annotations: AppTypes.AnnotationValue[], within: null|string) => {
+// 	const tokens = [] as string[][];
+
+// 	annotations.forEach(({id, case: caseSensitive, value, type}) => {
+// 		switch (type) {
+// 			case 'pos': {
+// 				const arr = (tokens[0] = tokens[0] || []);
+// 				arr.push(value); // already valid cql, no escaping or wildcard substitution.
+// 				return;
+// 			}
+// 			case 'select':
+// 			case 'text':
+// 			case 'combobox': {
+// 				value
+// 				.replace(/"/g, '')
+// 				.trim()
+// 				.split(/\s+/)
+// 				.filter(v => !!v)
+// 				.forEach((word, i) => {
+// 					const arr = (tokens[i] = tokens[i] || []);
+// 					arr.push(`${id}="${(caseSensitive ? '(?-i)' : '') + makeWildcardRegex(word)}"`);
+// 				});
+// 				return;
+// 			}
+// 			default: throw new Error('Unimplemented cql serialization for annotation type ' + type);
+// 		}
+// 	});
+
+// 	let query = tokens.map(t => `[${t.join('&')}]`).join('');
+// 	if (query.length > 0 && within) {
+// 		query += ` within <${within}/>`;
+// 	}
+// 	return query || undefined;
+// };
 
 // TODO the clientside url generation story... https://github.com/INL/corpus-frontend/issues/95
 // Ideally use absolute urls everywhere, if the application needs to be proxied, let the proxy server handle it.

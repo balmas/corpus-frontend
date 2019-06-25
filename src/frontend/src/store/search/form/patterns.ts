@@ -13,24 +13,14 @@ import * as AnnotationStore from '@/store/search/form/annotations';
 
 import { debugLog } from '@/utils/debug';
 
-import { AnnotationEditorValue } from '@/store/search/form/annotations';
+import { AnnotationEditorInstance } from '@/store/search/form/annotations';
 import { mapReduce } from '@/utils';
-
-type AnnotationEditorInstance = (AnnotationEditorValue&{
-	id: string;
-});
 
 type ModuleRootState = {
 	simple: AnnotationEditorInstance|null;
 	extended: {
 		annotationEditors: {
 			[annotationEditorId: string]: AnnotationEditorInstance;
-		};
-		editorGroups: {
-			[groupId: string]: {
-				groupId: string;
-				editorIds: string[];
-			}
 		};
 		within: string|null;
 		splitBatch: boolean;
@@ -39,11 +29,22 @@ type ModuleRootState = {
 	expert: string|null;
 };
 
+type FullModuleRootState = ModuleRootState&{
+	extended: ModuleRootState['extended']&{
+		editorGroups: {
+			[groupId: string]: {
+				groupId: string;
+				editorIds: string[];
+			}
+		};
+	}
+}
+
 // There are three levels of state initialization
 // First: the basic state shape (this)
 // Then: the basic state shape with the appropriate annotation and filters created
 // Finally: the values initialized from the page's url on first load.
-const defaults: ModuleRootState = {
+const defaults: FullModuleRootState = {
 	// placeholder until initialization
 	simple: null,
 	extended: {
@@ -57,17 +58,28 @@ const defaults: ModuleRootState = {
 };
 
 const namespace = 'patterns';
-const b = getStoreBuilder<RootState>().module<ModuleRootState>(namespace, cloneDeep(defaults));
+const b = getStoreBuilder<RootState>().module<FullModuleRootState>(namespace, cloneDeep(defaults));
 
 const getState = b.state();
 
 const get = {
+	simple: {
+		fullEditorInstance: b.read(state => state.simple ? {...state.simple!, ...AnnotationStore.getState()[state.simple!.id]} : null, 'simple_fullEditorInstance')
+	},
 	/** Last submitted properties, these are already filtered to remove empty values, etc */
 	activeAnnotationEditors: b.read(state => Object.values(state.extended.annotationEditors).filter(e => !!e.value), 'activeAnnotationEditors'),
 	activeAnnotatinEditorMap: b.read(state => {
 		const temp: AnnotationEditorInstance[] = get.activeAnnotationEditors();
 		return mapReduce(temp, 'id');
 	}, 'activeAnnotationEditorMap'),
+	annotationEditorGroups: b.read<Array<{
+		groupId: string;
+		editorIds: string[];
+		editors: AnnotationStore.FullAnnotationEditorInstance[];
+	}>>(state => Object.values(state.extended.editorGroups).map(group => ({
+		...group,
+		editors: group.editorIds.map(id => ({...state.extended.annotationEditors[id], ...AnnotationStore.getState()[id]}))
+	})), 'annotationEditorGroups')
 };
 
 // const privateActions = {
@@ -166,17 +178,13 @@ const actions = {
 
 /** We need to call some function from the module before creating the root store or this module won't be evaluated (e.g. none of this code will run) */
 const init = () => {
-	let firstMainAnnotationSeen = false;
-	CorpusStore.get.annotations().forEach(annot => {
-		actions.extended.createAnnotationEditorInstance({
-			groupId: annot.groupId,
-			id: annot.id
-		});
-		if (annot.isMainAnnotation && !firstMainAnnotationSeen) {
-			actions.simple.annotationEditorId(annot.id);
-			firstMainAnnotationSeen = true;
-		}
-	});
+	CorpusStore.get.annotations()
+	.forEach(annot => actions.extended.createAnnotationEditorInstance({
+		groupId: annot.groupId,
+		id: annot.id
+	}));
+
+	actions.simple.annotationEditorId(CorpusStore.get.firstMainAnnotation().id);
 	debugLog('Finished initializing pattern module state shape');
 };
 

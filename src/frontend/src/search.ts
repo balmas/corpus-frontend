@@ -9,6 +9,7 @@ import Vue from 'vue';
 import VTooltip from 'v-tooltip';
 
 import Filters from '@/components/filters';
+import Annotations from '@/components/annotations';
 
 import {QueryBuilder, QueryBuilderOptionsDef} from '@/modules/cql_querybuilder';
 import * as RootStore from '@/store/search/';
@@ -117,6 +118,7 @@ Vue.config.errorHandler = (err, vm, info) => {
 	ga('send', 'exception', { exDescription: err.message, exFatal: true });
 };
 
+Vue.use(Annotations);
 Vue.use(Filters);
 Vue.use(VTooltip, {
 	popover: {

@@ -7,6 +7,7 @@ import * as FilterModule from '@/store/search/form/filters';
 import * as InterfaceModule from '@/store/search/form/interface';
 import * as PatternModule from '@/store/search/form/patterns';
 import * as GapModule from '@/store/search/form/gap';
+import * as AnnotationsModule from '@/store/search/form/annotations';
 
 type PartialRootState = {
 	explore: ExploreModule.ModuleRootState;
@@ -41,8 +42,9 @@ const actions = {
 };
 
 const init = () => {
-	ExploreModule.init();
+	AnnotationsModule.init();
 	FilterModule.init();
+	ExploreModule.init();
 	InterfaceModule.init();
 	PatternModule.init();
 	GapModule.init();

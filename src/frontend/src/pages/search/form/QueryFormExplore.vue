@@ -82,6 +82,8 @@
 
 				<div class="n-gram-container">
 					<div v-for="(token, index) in ngramTokens" :key="index" class="n-gram-token">
+
+
 						<SelectPicker
 							data-width="100%"
 
@@ -93,6 +95,19 @@
 
 							@change="updateTokenAnnotation(index, $event /* custom component - custom event values */)"
 						/>
+						<Component
+							:is="token.componentName"
+							:definition="token"
+							:textDirection="textDirection"
+							:value="token.value != null ? token.value : undefined"
+							:initialStringValue="token.stringValue"
+
+							@change-value="updateTokenValue({index, value: {value: $event}})"
+							@change-cql="updateTokenValue({index, value: {cql: $event}})"
+							@change-string-value="updateTokenValue({index, value: {stringValue: $event}})"
+						/>
+
+						<!--
 						<input
 							class="form-control"
 							type="text"
@@ -102,7 +117,7 @@
 							:dir="token.annotation.isMainAnnotation ? mainTokenTextDirection : undefined"
 
 							@change="updateTokenValue(index, $event.target.value /* native component - native event */)"
-						/>
+						/> -->
 					</div>
 				</div>
 			</div>
@@ -130,6 +145,7 @@
 import Vue from 'vue';
 
 import * as CorpusStore from '@/store/search/corpus';
+import * as AnnotationStore from '@/store/search/form/annotations';
 import * as InterfaceStore from '@/store/search/form/interface';
 import * as ExploreStore from '@/store/search/form/explore';
 import * as UIStore from '@/store/search/ui';
@@ -141,6 +157,7 @@ export default Vue.extend({
 		SelectPicker
 	},
 	computed: {
+		textDirection: CorpusStore.get.textDirection,
 		exploreMode: {
 			get(): string { return InterfaceStore.getState().exploreMode; },
 			set: InterfaceStore.actions.exploreMode,
@@ -156,12 +173,7 @@ export default Vue.extend({
 			set: ExploreStore.actions.ngram.groupAnnotationId,
 		},
 
-		ngramTokens() {
-			return ExploreStore.get.ngram.tokens().map(tok => ({
-				...tok,
-				annotation: CorpusStore.get.annotationsMap()[tok.id][0]
-			}));
-		},
+		ngramTokens: ExploreStore.get.ngram.tokens,
 		ngramSizeMax: ExploreStore.get.ngram.maxSize,
 
 		frequencyType: {
@@ -179,10 +191,12 @@ export default Vue.extend({
 		},
 
 		ngramAnnotationOptions(): Option[] {
-			const annotations = CorpusStore.get.annotationDisplayNames();
+			const annotations = AnnotationStore.getState();
+
 			return UIStore.getState().explore.shownAnnotationIds.map(id => ({
 				value: id,
-				label: annotations[id]
+				label: annotations[id].displayName,
+				title: annotations[id].description
 			}));
 		},
 
@@ -220,15 +234,15 @@ export default Vue.extend({
 	},
 	methods: {
 		updateTokenAnnotation(index: number, id: string) {
-			ExploreStore.actions.ngram.token({
+			ExploreStore.actions.ngram.tokenType({
 				index,
-				token: { id }
+				id
 			});
 		},
-		updateTokenValue(index: number, value: string) {
-			ExploreStore.actions.ngram.token({
+		updateTokenValue(index: number, value: Partial<AnnotationStore.AnnotationEditorInstance>) {
+			ExploreStore.actions.ngram.tokenValue({
 				index,
-				token: { value }
+				value,
 			});
 		}
 	},

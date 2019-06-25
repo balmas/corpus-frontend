@@ -9,26 +9,15 @@
 		</ul>
 		<div class="tab-content">
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='simple'}]" id="simple">
+				<!-- TODO render the full annotation instance? requires some changes to bind to store correctly and apply appropriate classes though -->
 				<div class="form-group form-group-lg">
-
-					<Component
-						:is="simpleAnnotationEditor.componentName"
-						:definition="simpleAnnotationEditor"
-						:textDirection="textDirection"
-						:value="simpleAnnotationEditor.value != null ? simpleAnnotationEditor.value : undefined"
-
-						@change-value="onAnnotationValueChange(simpleAnnotationEditor.id, $event)"
-						@change-cql="onAnnotationCqlChange(simpleAnnotationEditor.id, $event)"
-						@change-string-value="onAnnotationStringValueChange(simpleAnnotationEditor.id, $event)"
-					/>
-
-					<!-- <label class="control-label"
-						:for="simpleAnnotationEditor.id + '_' + uid"
+					<label class="control-label"
+						:for="firstMainAnnotation.id + '_' + uid"
 						:title="firstMainAnnotation.description || undefined"
 					>{{firstMainAnnotation.	displayName}}
-					</label> -->
+					</label>
 
-					<!-- <SelectPicker v-if="firstMainAnnotation.uiType === 'select'"
+					<SelectPicker v-if="firstMainAnnotation.uiType === 'select'"
 						data-width="100%"
 						data-class="btn btn-lg btn-default"
 
@@ -57,7 +46,7 @@
 							:autocomplete="firstMainAnnotation.uiType !== 'combobox'"
 							v-model="simple"
 						/>
-					</AutocompleteSimple> -->
+					</AutocompleteSimple>
 				</div>
 			</div>
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='extended'}]" id="extended">
@@ -73,34 +62,16 @@
 							:key="index"
 							:id="getTabId(tab.name)"
 						>
-							<Component v-for="editor in tab.editors" :key="editor.id"
-								:is="editor.componentName"
-								:definition="editor"
-								:textDirection="textDirection"
-								:value="editor.value != null ? editor.value : undefined"
-
-								@change-value="onAnnotationValueChange(editor.id, $event)"
-								@change-cql="onAnnotationCqlChange(editor.id, $event)"
-								@change-string-value="onAnnotationStringValueChange(editor.id, $event)"
-							/>
+							<Annotation v-for="annotation in tab.annotations" :key="annotation.annotatedFieldId + '/' + annotation.id" :annotation="annotation"/>
 						</div>
 					</div>
 				</template>
 				<template v-else>
-					<Component v-for="editor in allEditors" :key="editor.id"
-						:is="editor.componentName"
-						:definition="editor"
-						:textDirection="textDirection"
-						:value="editor.value != null ? editor.value : undefined"
-
-						@change-value="onAnnotationValueChange(editor.id, $event)"
-						@change-cql="onAnnotationCqlChange(editor.id, $event)"
-						@change-string-value="onAnnotationStringValueChange(editor.id, $event)"
-					/>
+					<Annotation v-for="annotation in allAnnotations" :key="annotation.annotatedFieldId + '/' + annotation.id" :annotation="annotation"/>
 				</template>
 
 				<!-- show this even if it's disabled when "within" contains a value, or you can never remove the value -->
-				<!-- this will probably never happen - but it could, if someone manually imports a query with a "within" clause active -->
+				<!-- this will probably never happen, but it could, if someone imports a query with a "within" clause active from somewhere -->
 				<div v-if="withinOptions.length || within" class="form-group">
 					<label class="col-xs-12 col-md-3">Within:</label>
 
@@ -164,10 +135,11 @@ import * as PatternStore from '@/store/search/form/patterns';
 import * as GapStore from '@/store/search/form/gap';
 import * as HistoryStore from '@/store/search/history';
 import * as UIStore from '@/store/search/ui';
-import * as AnnotationStore from '@/store/search/form/annotations';
 
-import { Option } from '@/components/SelectPicker.vue';
+import Annotation from '@/pages/search/form/Annotation.vue';
+import SelectPicker, { Option } from '@/components/SelectPicker.vue';
 // @ts-ignore
+import Autocomplete from '@/mixins/autocomplete';
 import uid from '@/mixins/uid';
 
 
@@ -176,10 +148,38 @@ import { QueryBuilder } from '@/modules/cql_querybuilder';
 import { paths } from '@/api';
 import * as AppTypes from '@/types/apptypes';
 
+// TODO this is very hacky, but it works...
+const AutocompleteSimple = Vue.extend({
+	mixins: [Autocomplete],
+	// @ts-ignore
+	render() { return this._c('div', [this._t("default")], 2) },
+	props: {
+		annotation: Object as () => AppTypes.NormalizedAnnotation,
+		value: String,
+	},
+	data: () => ({
+		initialized: false,
+	}),
+	computed: {
+		autocomplete(): boolean { return this.annotation.uiType === 'combobox' && this.initialized; },
+		autocompleteUrl(): string { return paths.autocompleteAnnotation(CorpusStore.getState().id, this.annotation.annotatedFieldId, this.annotation.id); },
+	},
+	methods: {
+		autocompleteSelected(value: string) { this.$emit('input', value); },
+	},
+	mounted() {
+		this.$refs.autocomplete = this.$el.querySelector('input')!;
+		this.initialized = true;
+	}
+});
 
 export default Vue.extend({
 	mixins: [uid],
-
+	components: {
+		Annotation,
+		AutocompleteSimple,
+		SelectPicker
+	},
 	data: () => ({
 		parseQueryError: null as string|null,
 		importQueryError: null as string|null,
@@ -192,12 +192,14 @@ export default Vue.extend({
 		useTabs() {
 			return this.tabs.length > 1;
 		},
-		tabs: PatternStore.get.annotationEditorGroups,
-		allEditors(): AnnotationStore.FullAnnotationEditorInstance[] {
-			const editorDefinitions = AnnotationStore.getState();
-			return this.tabs.flatMap(t => t.editors);
+		tabs: CorpusStore.get.annotationGroups,
+		allAnnotations(): AppTypes.NormalizedAnnotation[] {
+			return this.tabs.reduce((acc, tab) => {
+				acc.push(...tab.annotations);
+				return acc;
+			}, [] as AppTypes.NormalizedAnnotation[]);
 		},
-		simpleAnnotationEditor: PatternStore.get.simple.fullEditorInstance,
+		firstMainAnnotation: CorpusStore.get.firstMainAnnotation,
 		textDirection: CorpusStore.get.textDirection,
 		withinOptions(): Option[] {
 			const {enabled, elements} = UIStore.getState().search.extended.within;
@@ -212,6 +214,10 @@ export default Vue.extend({
 			get(): boolean { return PatternStore.getState().extended.splitBatch; },
 			set: PatternStore.actions.extended.splitBatch
 		},
+		simple: {
+			get(): string|null { return PatternStore.getState().simple; },
+			set: PatternStore.actions.simple,
+		},
 		advanced: {
 			get(): string|null { return PatternStore.getState().advanced; },
 			set: PatternStore.actions.advanced,
@@ -223,7 +229,7 @@ export default Vue.extend({
 		gapValue: {
 			get: GapStore.get.gapValue,
 			set: GapStore.actions.gapValue
-		},
+		}
 	},
 	methods: {
 		getTabId(name: string) {
@@ -275,11 +281,7 @@ export default Vue.extend({
 
 			el.value = `${textStart}\t${textEnd}`;
 			el.selectionEnd = el.selectionStart = originalSelectionStart + 1;
-		},
-
-		onAnnotationValueChange(id: string, value: any) { PatternStore.actions.extended.annotationEditorValue({id, value}); },
-		onAnnotationCqlChange(id: string, cql: null|string|string[]) { PatternStore.actions.extended.annotationEditorCql({id, cql}); },
-		onAnnotationStringValueChange(id: string, stringvalue: string[]) { PatternStore.actions.extended.annotationEditorStringValue({id, stringvalue}); },
+		}
 	}
 })
 </script>

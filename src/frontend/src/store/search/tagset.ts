@@ -39,6 +39,7 @@ const get = {
 const internalActions = {
 	state: b.commit((state, payload: {state: ModuleRootState['state'], message: string}) => Object.assign(state, payload), 'state'),
 	replace: b.commit((state, payload: Tagset) => {
+		// @ts-ignore
 		const annot = CorpusStore.get.annotations().find(a => a.uiType === 'pos');
 		if (annot == null) {
 			throw new Error(`Tagset isn't attached to any annotation! Set uiType to 'pos' on a single annotation to enable.`);
@@ -75,6 +76,7 @@ const actions = {
 			// Apply top-level displaynames to the 'pos' annotation
 			Object.values(annots)
 			.flat()
+			// @ts-ignore
 			.filter(a => a.uiType === 'pos')
 			.forEach(originalAnnotation => {
 				const originalValues = mapReduce(originalAnnotation.values, 'value');

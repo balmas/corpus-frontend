@@ -2,8 +2,10 @@ import Vue from 'vue';
 
 import { AnnotationEditorDefinition } from '@/store/search/form/annotations';
 import { Token } from '@/utils/cqlparser';
+import uid from '@/mixins/uid';
 
 const baseAnnotationEditor = Vue.extend({
+	mixins: [uid],
 	props: {
 		definition: {
 			type: Object as () => AnnotationEditorDefinition,
@@ -11,6 +13,7 @@ const baseAnnotationEditor = Vue.extend({
 		},
 		// you should probably set a default value in the extended component.
 		value: undefined as any as () => any,
+		initialStringValue: Array as () => string[],
 		textDirection: {
 			type: String as () => 'ltr'|'rtl',
 			required: true
@@ -26,13 +29,14 @@ const baseAnnotationEditor = Vue.extend({
 		/**
 		 * Called on first load, convert the initial query to a valid state for the value prop,
 		 * what this looks like is up to the implementation.
-		 * When this is called the component will not be mounted, though all props with exception of value will be available.
-		 * If the query could not be decoded, the default empty value state should be returned.
+		 * When this is called the component will not have been mounted, though all props with exception of value will be available.
+		 * If the query could not be decoded, null should be returned.
 		 */
-		decodeInitialState(ast: Token[]): any { throw new Error('missing decodeInitialState() implementation in annotation editor'); }
+		decodeInitialState(ast: Token[]): any { throw new Error('missing decodeInitialState() implementation in annotation editor'); },
+		decodeInitialStateFromStringValue(sv: string[]) { throw new Error('missing decodeInitialStateFromStringValue() implementation in annotation editor'); }
 	},
 	computed: {
-		id(): string { return this.definition.id; },
+		id(): string { return this.definition.id + (this as any).uid; },
 		inputId(): string { return `${this.id}_value`; },
 		displayName(): string { return this.definition.displayName || this.definition.id; },
 		description(): string|undefined { return this.definition.description; },
@@ -44,6 +48,11 @@ const baseAnnotationEditor = Vue.extend({
 		cql(v: string|string[]|null) { this.e_changecql(v); },
 		stringvalue(v: string[]) { this.e_changestringvalue(v); },
 	},
+	created() {
+		if (this.$attrs.value == null && this.initialStringValue.length) {
+			this.e_input(this.decodeInitialStateFromStringValue(this.initialStringValue));
+		}
+	}
 });
 
 export default baseAnnotationEditor;

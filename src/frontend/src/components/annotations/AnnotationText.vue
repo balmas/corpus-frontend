@@ -14,7 +14,7 @@
 					:dir="textDirection"
 					:value="value.value"
 
-					@input="e_input({value: $event, caseSensitive})"
+					@input="e_input({value: $event, caseSensitive: value.caseSensitive})"
 				/>
 				<div class="input-group-btn">
 					<label class="btn btn-default file-input-button" :for="fileInputId">
@@ -30,7 +30,7 @@
 					</label>
 				</div>
 			</div>
-			<div v-if="annotation.caseSensitive" class="checkbox">
+			<div v-if="metadata.caseSensitive" class="checkbox">
 				<label :for="caseInputId">
 					<input
 						type="checkbox"
@@ -51,9 +51,10 @@
 <script lang="ts">
 import BaseAnnotationEditor from '@/components/annotations/Annotation';
 
-import { escapeLucene, MapOf, unescapeLucene, escapeRegex } from '@/utils';
+import { escapeLucene, MapOf, unescapeLucene, escapeRegex, unescapeRegex } from '@/utils';
 import { FilterValue } from '@/types/apptypes';
 import { AnnotationEditorDefinition } from '../../store/search/form/annotations';
+import { Token, BinaryOp } from '../../utils/cqlparser';
 
 type Metadata = {
 	caseSensitive: boolean;
@@ -69,13 +70,15 @@ export default BaseAnnotationEditor.extend({
 		value: {
 			type: Object as () => Value,
 			required: true,
-			default: {
+			default: () => ({
 				value: '',
 				caseSensitive: false,
-			}
+			})
 		},
 	},
 	computed: {
+		fileInputId(): string { return this.inputId + '_file'; },
+		caseInputId(): string { return this.inputId + '_case'; },
 		metadata(): Metadata { return this.definition.metadata as Metadata; },
 		cql(): string|string[]|null {
 			const {value, caseSensitive} = this.value as Value;
@@ -113,10 +116,76 @@ export default BaseAnnotationEditor.extend({
 		},
 	},
 	methods: {
-		decodeInitialState(filterValues: MapOf<FilterValue>): Value {
-			const v = filterValues[this.id];
-			return undefined as any;
-			// return v ? v.values.map(unescapeLucene).map(val => val.match(/\s+/) ? `"${val}"` : val).join(' ') || null : null;
+		decodeInitialState(ast: Token[]): Value|undefined {
+			function isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); }
+			function stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
+
+
+			const values: Array<string|null> = [];
+			let caseSensitive = false;
+
+			for (let i = 0; i < ast.length; ++i) {
+				const token = ast[i];
+				if (token.leadingXmlTag || token.trailingXmlTag || token.repeats || token.optional) {
+					return undefined;
+				}
+
+				let value: string|null = null;
+
+				const stack = [token.expression];
+				let exp: Token['expression'];
+				while (exp = stack.shift()) {
+					if (exp.type === 'binaryOp') {
+						if (exp.operator !== 'AND' && exp.operator !== '&') {
+							// Clauses combined in an unsupported way, cannot parse.
+							return undefined;
+						}
+
+						stack.push(exp.left, exp.right);
+					} else if (exp.name === this.id) {
+						if (value != null) {
+							// Multiple values for this annotation at the same position
+							return undefined;
+						}
+
+						caseSensitive = caseSensitive || isCase(exp.value);
+						value = unescapeRegex(stripCase(exp.value), true);
+					}
+				}
+				if (value && value.match(/\s+/)) {
+					value = `"${value}"`;
+				}
+
+				values.push(value);
+			}
+
+			return {
+				caseSensitive,
+				value: values.join(' ')
+			}
+		},
+		onFileChanged(event: Event) {
+			const self = this;
+			const fileInput = event.target as HTMLInputElement;
+			const file = fileInput.files && fileInput.files[0];
+			if (file != null) {
+				const fr = new FileReader();
+				fr.onload = function() {
+					// Replace all whitespace with pipes,
+					// Same as the querybuilder wordlist upload
+					self.e_input({
+						caseSensitive: self.value.caseSensitive,
+						value: (fr.result as string).trim().replace(/\s+/g, '|')
+					});
+				};
+				fr.readAsText(file);
+			} else {
+				self.e_input({
+					caseSensitive: self.value.caseSensitive,
+					value: '',
+				})
+			}
+			(event.target as HTMLInputElement).value = '';
 		}
 	}
 });

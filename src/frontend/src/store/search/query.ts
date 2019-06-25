@@ -24,13 +24,12 @@ import cloneDeep from 'clone-deep';
 import {getStoreBuilder} from 'vuex-typex';
 
 import {RootState} from '@/store/search/';
-import { AnnotationValue} from '@/types/apptypes';
 import * as CorpusModule from '@/store/search/corpus';
 import * as PatternModule from '@/store/search/form/patterns';
 import * as FilterModule from '@/store/search/form/filters';
 import * as ExploreModule from '@/store/search/form/explore';
 import * as GapModule from '@/store/search/form/gap';
-import { getFilterString, getPatternString, makeWildcardRegex, getFilterSummary } from '@/utils';
+import { getFilterString, getPatternString, unescapeRegex, getFilterSummary, escapeRegex } from '@/utils';
 
 type ModuleRootStateSearch<K extends keyof PatternModule.ModuleRootState> = {
 	form: 'search';
@@ -86,7 +85,7 @@ const get = {
 					const stateHelper = state as ModuleRootStateExplore<'ngram'>;
 					return stateHelper.formState.tokens
 						.slice(0, stateHelper.formState.size)
-						.map(({id, value}) => value ? `[${id}="${makeWildcardRegex(value)}"]` : '[]')
+						.map(({id, value}) => value ? `[${id}="${escapeRegex(value, true)}"]` : '[]')
 						.join('');
 				}
 				default: throw new Error('Unknown submitted form ' + state.subForm + ' - cannot generate cql query');
@@ -97,20 +96,14 @@ const get = {
 			// The advanced and expert views already contain a good-to-go cql query. We only need to take care not to emit an empty string.
 			switch (state.subForm) {
 				case 'simple': {
-					const pattern = (state as ModuleRootStateSearch<'simple'>).formState;
-					if (!pattern) { return undefined; }
-					return getPatternString([{
-						case: false,
-						id: CorpusModule.get.firstMainAnnotation().id,
-						value: pattern,
-						type: 'text'
-					}], null);
+					const editorInstance = (state as ModuleRootStateSearch<'simple'>).formState;
+					if (!editorInstance) { return undefined; } // happens briefly during page initialization.
+					return getPatternString([editorInstance], null);
 				}
 				case 'extended': {
-					const pattern = (state as ModuleRootStateSearch<'extended'>).formState;
-					const annotations: AnnotationValue[] = Object.values(pattern.annotationValues).filter(annot => !!annot.value);
-					if (annotations.length === 0) { return undefined; }
-					return getPatternString(annotations, pattern.within);
+					const extendedFormState = (state as ModuleRootStateSearch<'extended'>).formState;
+					const annotationEditors = Object.values(extendedFormState.annotationEditors);
+					return getPatternString(annotationEditors, extendedFormState.within);
 				}
 				case 'advanced':
 				case 'expert': {
