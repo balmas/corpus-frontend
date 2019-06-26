@@ -29,7 +29,7 @@ import * as PatternModule from '@/store/search/form/patterns';
 import * as FilterModule from '@/store/search/form/filters';
 import * as ExploreModule from '@/store/search/form/explore';
 import * as GapModule from '@/store/search/form/gap';
-import { getFilterString, getPatternString, unescapeRegex, getFilterSummary, escapeRegex } from '@/utils';
+import { getFilterString, getPatternString, getFilterSummary, wildcardToRegex } from '@/utils';
 
 type ModuleRootStateSearch<K extends keyof PatternModule.ModuleRootState> = {
 	form: 'search';
@@ -85,7 +85,7 @@ const get = {
 					const stateHelper = state as ModuleRootStateExplore<'ngram'>;
 					return stateHelper.formState.tokens
 						.slice(0, stateHelper.formState.size)
-						.map(({id, value}) => value ? `[${id}="${escapeRegex(value, true)}"]` : '[]')
+						.map(({id, value}) => value ? `[${id}="${wildcardToRegex(value)}"]` : '[]')
 						.join('');
 				}
 				default: throw new Error('Unknown submitted form ' + state.subForm + ' - cannot generate cql query');

@@ -5,57 +5,20 @@ import * as AppTypes from '@/types/apptypes';
 import { FilterState, FullFilterState } from '@/store/search/form/filters';
 import { AnnotationEditorInstance } from '@/store/search/form/annotations';
 
-/**
- * Escapes the regex term. This is done by escaping all special characters on an individual basis.
- * When wildcards should be preserved, the character * is replaced by .*, and the ? is replaced by .
- * Additionally, the | character is preserved.
- *
- * @param original the input string
- * @param preserveWildcards whether to preserve wildcards
- */
-export function escapeRegex(original: string, preserveWildcards: boolean) {
-	let ret = original
-	ret = ret.replace(/([\^$\-\\.(){}[\]+\\])/g, '\\$1') // add slashes for regex characters
-	if (preserveWildcards) {
-		ret = ret.replace(/\*+/g, '.*');        // '*' wildcard -> '.*' regex
-		ret = ret.replace(/\?/g, '.');           // '?' wildcard -> '.' regex
-	} else {
-		ret = ret.replace(/([\*\?])/g, '\\$1'); // escape wildcard characters
-	}
-	return ret;
+export function wildcardToRegex(original: string) {
+	return original
+		.replace(/([\^$\-\\.(){}[\]+])/g, '\\$1') // add slashes for regex characters
+		.replace(/\*/g, '.*') // * -> .*
+		.replace(/\?/g, '.'); // ? -> .
 }
 
-/**
- * Unescapes backslash-escaped special regex characters.
- *
- * @param original the escaped regex string
- * @param unescapeToWildcards map ".*" to "*"  and "." to "?".
- */
-export function unescapeRegex(original: string, unescapeToWildcards: boolean) {
-	let ret = original;
-
-	// prior to de-escaping anything
-	// replace all the wildcard output patterns with the original wildcard
-
-	if (unescapeToWildcards) {
-		debugger; // this needs to match an uneven amount of backslashes
-		ret = ret.replace(/(\\\.)/g, '__ESC_PERIOD__');
-		ret = ret.replace(/(\.\*)/g, '*'); // .* -> *
-		ret = ret.replace(/(\.)/g, '$1?');     // .  -> ?
-		ret = ret.replace('__ESC_PERIOD__', '.');
-	}
-
-	// now replace all escaped special characters
-	ret = ret.replace(/\\([\^$\-\.\?\*(){}[\]+\\])/g, '$1'); // remove most slashes
-
-	// .replace(/[^\\](\.)/g, unescapeToWildcards ? '?' : '.')
-	// // escape \. (because we don't want to substitute "\." with "?", and we can't test for preceding characters easily.)
-	// .replace(/\\\./g, '_ESC_PERIOD_')
-	// .replace(/\.\*/g, unescapeToWildcards ? '*' : '.*') // restore *
-	// .replace(/\./g,   unescapeToWildcards ? '?' : '.') // restore ?
-	// .replace(/_ESC_PERIOD_/g, '.'); // unescape \. to .
-
-	return ret;
+export function regexToWildcard(original: string) {
+	return original
+	.replace(/\\([\^$\-\\(){}[\]+])/g, '$1') // remove most slashes
+	.replace(/\\\./g, '_ESC_PERIOD_') // escape \.
+	.replace(/\.\*/g, '*') // restore *
+	.replace(/\./g, '?') // restore ?
+	.replace(/_ESC_PERIOD_/g, '.'); // unescape \. to .
 }
 
 /**

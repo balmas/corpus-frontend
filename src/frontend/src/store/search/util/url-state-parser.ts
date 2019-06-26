@@ -5,7 +5,7 @@ import memoize from 'memoize-decorator';
 import BaseUrlStateParser from '@/store/util/url-state-parser-base';
 import LuceneQueryParser from 'lucene-query-parser';
 
-import { mapReduce, MapOf, unescapeRegex } from '@/utils';
+import { mapReduce, MapOf, regexToWildcard } from '@/utils';
 import parseCql, {Attribute} from '@/utils/cqlparser';
 import parseLucene from '@/utils/luceneparser';
 import { debugLog } from '@/utils/debug';
@@ -289,7 +289,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			size: cql.tokens.length,
 			tokens: cql.tokens.map(t => ({
 				id: t.expression ? (t.expression as Attribute).name : CorpusModule.get.firstMainAnnotation().id,
-				stringValue: t.expression ? [unescapeRegex((t.expression as Attribute).value, true)] : [],
+				stringValue: t.expression ? [regexToWildcard((t.expression as Attribute).value)] : [],
 				cql: null,
 				value: null
 			})),

@@ -51,7 +51,7 @@
 <script lang="ts">
 import BaseAnnotationEditor from '@/components/annotations/Annotation';
 
-import { escapeLucene, MapOf, unescapeLucene, escapeRegex, unescapeRegex } from '@/utils';
+import { escapeLucene, MapOf, unescapeLucene, regexToWildcard, wildcardToRegex } from '@/utils';
 import { FilterValue } from '@/types/apptypes';
 import { AnnotationEditorDefinition } from '../../store/search/form/annotations';
 import { Token, BinaryOp } from '../../utils/cqlparser';
@@ -95,7 +95,7 @@ export default BaseAnnotationEditor.extend({
 				// "split word" behind another few --> ["split word", "behind", "another", "few"]
 				// "wild* in split words" and such --> ["wild.* in split words", "and", "such"]
 
-				return inQuotes ? escapeRegex(v, true) : v.split(/\s+/).filter(s => !!s).map(val => escapeRegex(val, true));
+				return inQuotes ? wildcardToRegex(v) : v.split(/\s+/).filter(s => !!s).map(val => wildcardToRegex(val));
 			});
 
 			debugLog('recalculated cql for annotation '+this.id);
@@ -131,7 +131,8 @@ export default BaseAnnotationEditor.extend({
 					return undefined;
 				}
 
-				let value: string|null = null;
+				let hasValue = false;
+
 
 				const stack = [token.expression];
 				let exp: Token['expression'];
@@ -145,26 +146,21 @@ export default BaseAnnotationEditor.extend({
 
 						stack.push(exp.left, exp.right);
 					} else if (exp.name === this.annotationId) {
-						if (value != null) {
-							// Multiple values for this annotation at the same position
+						if (hasValue) {
+							// multiple values for the same annotation in the same token - unsupported.
 							return undefined;
 						}
-
-						value = exp.value;
+						let value = exp.value;
 						if (isCase(value)) {
 							value = stripCase(exp.value);
 							caseSensitive = true;
 						}
-						debugger;
-						value = unescapeRegex(value, true);
+						value = regexToWildcard(value);
 						if (value.match(/\s+/)) {
 							value = `"${value}"`;
 						}
+						values.push(value);
 					}
-				}
-
-				if (value) {
-					values.push(value);
 				}
 			}
 
