@@ -495,7 +495,6 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 				value: undefined,
 				textDirection: CorpusModule.getState().textDirection,
 				definition: editorDefinition,
-				initialStringValue: []
 			},
 		});
 

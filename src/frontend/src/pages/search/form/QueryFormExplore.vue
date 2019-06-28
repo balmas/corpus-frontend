@@ -100,7 +100,6 @@
 							:definition="token"
 							:textDirection="textDirection"
 							:value="token.value != null ? token.value : undefined"
-							:initialStringValue="token.stringValue"
 
 							@change-value="updateTokenValue(index, {value: $event})"
 							@change-cql="updateTokenValue(index, {cql: $event})"

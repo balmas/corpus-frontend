@@ -10,13 +10,20 @@
 		<div class="tab-content">
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='simple'}]" id="simple">
 				<div class="form-group form-group-lg">
+					<Component v-if="simpleAnnotationEditor"
+						:is="simpleAnnotationEditor.definition.componentName"
+						:definition="simpleAnnotationEditor.definition"
+						:textDirection="textDirection"
+						:value="simpleAnnotationEditor.value.value != null ? simpleAnnotationEditor.value.value : undefined"
 
+						@change-value="onSimpleAnnotationValueChange(simpleAnnotationEditor.definition.id, $event)"
+						@change-cql="onSimpleAnnotationCqlChange(simpleAnnotationEditor.definition.id, $event)"
+					/>
 					<!-- <Component
 						:is="simpleAnnotationEditor.componentName"
 						:definition="simpleAnnotationEditor"
 						:textDirection="textDirection"
 						:value="simpleAnnotationEditor.value != null ? simpleAnnotationEditor.value : undefined"
-						:initialStringValue="simpleAnnotationEditor.stringValue"
 
 						@change-value="onSimpleAnnotationValueChange(simpleAnnotationEditor.id, $event)"
 						@change-cql="onSimpleAnnotationCqlChange(simpleAnnotationEditor.id, $event)"
@@ -79,7 +86,6 @@
 								:definition="editor.definition"
 								:textDirection="textDirection"
 								:value="editor.values.value != null ? editor.values.value : undefined"
-								:initialStringValue="editor.values.stringValue"
 
 								@change-value="onAnnotationValueChange(editor.definition.id, $event)"
 								@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"
@@ -94,7 +100,6 @@
 						:definition="editor.definition"
 						:textDirection="textDirection"
 						:value="editor.values.value != null ? editor.values.value : undefined"
-						:initialStringValue="editor.values.stringValue"
 
 						@change-value="onAnnotationValueChange(editor.definition.id, $event)"
 						@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"

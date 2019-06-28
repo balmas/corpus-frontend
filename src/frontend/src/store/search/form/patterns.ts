@@ -64,7 +64,7 @@ const getState = b.state();
 
 const get = {
 	simple: {
-		fullEditorInstance: b.read(state => state.simple ? {...state.simple!, ...AnnotationStore.getState()[state.simple!.id]} : null, 'simple_fullEditorInstance')
+		fullEditorInstance: b.read(state => state.simple ? { value: state.simple, definition: AnnotationStore.getState()[state.simple!.id] } : null, 'simple_fullEditorInstance')
 	},
 	/** Last submitted properties, these are already filtered to remove empty values, etc */
 	activeAnnotationEditors: b.read(state => Object.values(state.extended.annotationEditors).filter(e => !!e.value), 'activeAnnotationEditors'),
