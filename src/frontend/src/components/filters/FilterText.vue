@@ -16,7 +16,7 @@
 				:dir="textDirection"
 				:value="value"
 
-				@input="e_input"
+				@input="e_input($event.target.value)"
 			/>
 		</div>
 	</div>
