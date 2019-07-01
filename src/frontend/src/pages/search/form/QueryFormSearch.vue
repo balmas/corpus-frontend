@@ -11,65 +11,19 @@
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='simple'}]" id="simple">
 				<div class="form-group form-group-lg">
 					<Component v-if="simpleAnnotationEditor"
+						outputMultipleTokens
 						:is="simpleAnnotationEditor.definition.componentName"
 						:definition="simpleAnnotationEditor.definition"
 						:textDirection="textDirection"
 						:value="simpleAnnotationEditor.value.value != null ? simpleAnnotationEditor.value.value : undefined"
 
-						@change-value="onSimpleAnnotationValueChange(simpleAnnotationEditor.definition.id, $event)"
-						@change-cql="onSimpleAnnotationCqlChange(simpleAnnotationEditor.definition.id, $event)"
+						@change-value="onSimpleAnnotationValueChange"
+						@change-cql="onSimpleAnnotationCqlChange"
 					/>
-					<!-- <Component
-						:is="simpleAnnotationEditor.componentName"
-						:definition="simpleAnnotationEditor"
-						:textDirection="textDirection"
-						:value="simpleAnnotationEditor.value != null ? simpleAnnotationEditor.value : undefined"
-
-						@change-value="onSimpleAnnotationValueChange(simpleAnnotationEditor.id, $event)"
-						@change-cql="onSimpleAnnotationCqlChange(simpleAnnotationEditor.id, $event)"
-						@change-string-value="onSimpleAnnotationStringValueChange(simpleAnnotationEditor.id, $event)"
-					/> -->
-
-					<!-- <label class="control-label"
-						:for="simpleAnnotationEditor.id + '_' + uid"
-						:title="firstMainAnnotation.description || undefined"
-					>{{firstMainAnnotation.	displayName}}
-					</label> -->
-
-					<!-- <SelectPicker v-if="firstMainAnnotation.uiType === 'select'"
-						data-width="100%"
-						data-class="btn btn-lg btn-default"
-
-						:searchable="firstMainAnnotation.values.length > 20"
-						:placeholder="firstMainAnnotation.displayName"
-						:data-id="firstMainAnnotation.id + '_' + uid"
-						:data-name="firstMainAnnotation.id + '_' + uid"
-						:data-dir="textDirection"
-
-						:options="firstMainAnnotation.values"
-
-						v-model="simple"
-					/>
-
-					<AutocompleteSimple v-else
-						:annotation="firstMainAnnotation"
-						v-model="simple"
-					>
-						<input
-							type="text"
-							class="form-control"
-
-							:id="firstMainAnnotation.id + '_' + uid"
-							:placeholder="firstMainAnnotation.displayName"
-							:dir="textDirection"
-							:autocomplete="firstMainAnnotation.uiType !== 'combobox'"
-							v-model="simple"
-						/>
-					</AutocompleteSimple> -->
 				</div>
 			</div>
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='extended'}]" id="extended">
-				<template v-if="useTabs">
+				<!-- <template v-if="useTabs">
 					<ul class="nav nav-tabs subtabs">
 						<li v-for="(tab, index) in tabs" :class="{'active': index === 0}" :key="index">
 							<a :href="'#'+getTabId(tab.name)" data-toggle="tab">{{tab.name}}</a>
@@ -82,6 +36,7 @@
 							:id="getTabId(tab.name)"
 						>
 							<Component v-for="editor in tab.editors" :key="editor.definition.id"
+								outputMultipleTokens
 								:is="editor.definition.componentName"
 								:definition="editor.definition"
 								:textDirection="textDirection"
@@ -89,13 +44,13 @@
 
 								@change-value="onAnnotationValueChange(editor.definition.id, $event)"
 								@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"
-								@change-string-value="onAnnotationStringValueChange(editor.definition.id, $event)"
 							/>
 						</div>
 					</div>
 				</template>
 				<template v-else>
 					<Component v-for="editor in allEditors" :key="editor.definition.id"
+						outputMultipleTokens
 						:is="editor.definition.componentName"
 						:definition="editor.definition"
 						:textDirection="textDirection"
@@ -103,9 +58,8 @@
 
 						@change-value="onAnnotationValueChange(editor.definition.id, $event)"
 						@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"
-						@change-string-value="onAnnotationStringValueChange(editor.definition.id, $event)"
 					/>
-				</template>
+				</template> -->
 
 				<!-- show this even if it's disabled when "within" contains a value, or you can never remove the value -->
 				<!-- this will probably never happen - but it could, if someone manually imports a query with a "within" clause active -->
@@ -288,10 +242,13 @@ export default Vue.extend({
 			PatternStore.actions.extended.annotationEditorValue({id, value});
 		},
 		onAnnotationCqlChange(id: string, cql: null|string|string[]) { PatternStore.actions.extended.annotationEditorCql({id, cql}); },
-		onAnnotationStringValueChange(id: string, stringValue: string[]) { PatternStore.actions.extended.annotationEditorStringValue({id, stringValue}); },
 
-		onSimpleAnnotationValueChange(value: any) { PatternStore.actions.simple.annotationEditorValue(value); },
-		onSimpleAnnotationCqlChange(id: string, cql: null|string|string[]) { PatternStore.actions.simple.annotationEditorCql(cql); },
+		onSimpleAnnotationValueChange(value: any) {
+			PatternStore.actions.simple.annotationEditorValue(value);
+		},
+		onSimpleAnnotationCqlChange(cql: null|string|string[]) {
+			PatternStore.actions.simple.annotationEditorCql(cql);
+		},
 	}
 })
 </script>

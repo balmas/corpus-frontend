@@ -14,7 +14,7 @@
 					:dir="textDirection"
 					:value="value.value"
 
-					@input="e_input({value: $event.target.value || '', caseSensitive: value.caseSensitive})"
+					@input="e_input({value: $event.target.value, caseSensitive: value.caseSensitive})"
 				/>
 				<div class="input-group-btn">
 					<label class="btn btn-default file-input-button" :for="fileInputId">
@@ -40,9 +40,7 @@
 						:checked="value.caseSensitive"
 
 						@change="e_input({value: value.value, caseSensitive: $event.target.checked})"
-					>
-					Case&nbsp;and&nbsp;diacritics&nbsp;sensitive
-				</label>
+					>Case and diacritics sensitive</label>
 			</div>
 		</div>
 	</div>
@@ -53,9 +51,9 @@ import BaseAnnotationEditor from '@/components/annotations/Annotation';
 
 import { escapeLucene, MapOf, unescapeLucene, regexToWildcard, wildcardToRegex } from '@/utils';
 import { FilterValue } from '@/types/apptypes';
-import { AnnotationEditorDefinition } from '../../store/search/form/annotations';
-import { Token, BinaryOp } from '../../utils/cqlparser';
-import { debugLog } from '../../utils/debug';
+import { AnnotationEditorDefinition } from '@/store/search/form/annotations';
+import { Token, BinaryOp, Attribute } from '@/utils/cqlparser';
+import { debugLog } from '@/utils/debug';
 
 type Metadata = {
 	caseSensitive: boolean;
@@ -84,7 +82,7 @@ export default BaseAnnotationEditor.extend({
 		cql(): string|string[]|null {
 			const {value, caseSensitive} = this.value as Value;
 
-			const resultParts = value
+			let resultParts = value
 			.split(/"/)
 			.flatMap((v, i) => {
 				if (!v) {
@@ -100,23 +98,9 @@ export default BaseAnnotationEditor.extend({
 
 			debugLog('recalculated cql for annotation '+this.id);
 
-			return resultParts.length ? resultParts.map(v => caseSensitive ? `(?-i)${v}` : v).map(v => `${this.annotationId}="${v}"`) : null;
+			resultParts = resultParts.map(v => caseSensitive ? `(?-i)${v}` : v);
+			return resultParts.length ? this.outputMultipleTokens ? resultParts.map(v => `${this.annotationId}="${v}"`) : `${this.annotationId}="${resultParts.join('|')}"` : null;
 		},
-		// stringValue(): string[] {
-		// 	const {value} = this.value as Value;
-
-		// 	const resultParts = value
-		// 	.split(/"/)
-		// 	.flatMap((v, i) => {
-		// 		if (!v) {
-		// 			return [];
-		// 		}
-		// 		const inQuotes = (i % 2) !== 0;
-		// 		return inQuotes ? v : v.split(/\s+/).filter(s => !!s);
-		// 	});
-
-		// 	return resultParts; // may be empty
-		// },
 	},
 	methods: {
 		decodeInitialState(ast: Token[]): Value|undefined {
@@ -127,12 +111,10 @@ export default BaseAnnotationEditor.extend({
 			let caseSensitive = false;
 
 			for (const token of ast) {
+				let hasValueAtPosition = false;
 				if (token.leadingXmlTag || token.trailingXmlTag || token.repeats || token.optional) {
 					return undefined;
 				}
-
-				let hasValue = false;
-
 
 				const stack = [token.expression];
 				let exp: Token['expression'];
@@ -146,10 +128,11 @@ export default BaseAnnotationEditor.extend({
 
 						stack.push(exp.left, exp.right);
 					} else if (exp.name === this.annotationId) {
-						if (hasValue) {
+						if (hasValueAtPosition) {
 							// multiple values for the same annotation in the same token - unsupported.
 							return undefined;
 						}
+
 						let value = exp.value;
 						if (isCase(value)) {
 							value = stripCase(exp.value);
@@ -160,6 +143,7 @@ export default BaseAnnotationEditor.extend({
 							value = `"${value}"`;
 						}
 						values.push(value);
+						hasValueAtPosition = true;
 					}
 				}
 			}
@@ -191,8 +175,8 @@ export default BaseAnnotationEditor.extend({
 				});
 			}
 			(event.target as HTMLInputElement).value = '';
-		}
-	}
+		},
+	},
 });
 </script>
 

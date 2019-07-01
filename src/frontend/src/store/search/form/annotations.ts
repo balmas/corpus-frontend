@@ -31,9 +31,6 @@ export type AnnotationEditorInstance = {
 
 	/** Raw internal value for the component. null === default value, to be substituted by component itself. */
 	value: any|null;
-
-	/** TODO: used to transfer state from one instance to another of unknown implementation */
-	stringValue: string[];
 };
 
 export type FullAnnotationEditorInstance = AnnotationEditorDefinition&AnnotationEditorInstance;

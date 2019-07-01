@@ -81,9 +81,7 @@
 				</div>
 
 				<div class="n-gram-container">
-					<div v-for="(token, index) in ngramTokens" :key="index" class="n-gram-token">
-
-
+					<div v-for="(token, index) in ngramTokenDefinitions" :key="index" class="n-gram-token">
 						<SelectPicker
 							data-width="100%"
 
@@ -93,17 +91,16 @@
 							placeholder="Property"
 							hideEmpty
 
-							@change="updateTokenAnnotation(index, $event /* custom component - custom event values */)"
+							@change="updateTokenAnnotation(index, $event)"
 						/>
 						<Component :key="token.componentName"
 							:is="token.componentName"
 							:definition="token"
 							:textDirection="textDirection"
-							:value="token.value != null ? token.value : undefined"
+							:value="ngramTokenValues[index].value || undefined"
 
 							@change-value="updateTokenValue(index, {value: $event})"
 							@change-cql="updateTokenValue(index, {cql: $event})"
-							@change-string-value="updateTokenValue(index, {stringValue: $event})"
 						/>
 
 						<!--
@@ -172,7 +169,8 @@ export default Vue.extend({
 			set: ExploreStore.actions.ngram.groupAnnotationId,
 		},
 
-		ngramTokens: ExploreStore.get.ngram.tokens,
+		ngramTokenValues: ExploreStore.get.ngram.tokenValues,
+		ngramTokenDefinitions: ExploreStore.get.ngram.tokensDefinitions,
 		ngramSizeMax: ExploreStore.get.ngram.maxSize,
 
 		frequencyType: {
@@ -239,7 +237,6 @@ export default Vue.extend({
 			});
 		},
 		updateTokenValue(index: number, value: Partial<AnnotationStore.AnnotationEditorInstance>) {
-			debugger;
 			ExploreStore.actions.ngram.tokenValue({
 				index,
 				value,

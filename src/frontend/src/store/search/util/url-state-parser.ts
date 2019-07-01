@@ -32,6 +32,7 @@ import { FilterValue } from '@/types/apptypes';
 
 import BaseFilter from '@/components/filters/Filter';
 import baseAnnotationEditor from '@/components/annotations/Annotation';
+import { Token } from '@/utils/cqlparser';
 
 /**
  * Decode the current url into a valid page state configuration.
@@ -167,7 +168,6 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			// Can't parse from url, instead determine the best state based on other parameters.
 			const ui = InterfaceModule.defaults;
 
-
 			// show the pattern view that can hold the query
 			// the other views will have the query placed in it as well (if it fits), but this is more of a courtesy
 			// if no pattern exists, show the simplest search
@@ -287,14 +287,19 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			groupAnnotationId: annotationId,
 			maxSize: ExploreModule.defaults.ngram.maxSize,
 			size: cql.tokens.length,
-			tokens: cql.tokens.map(t => ({
-				id: t.expression ? (t.expression as Attribute).name : CorpusModule.get.firstMainAnnotation().id,
-				stringValue: t.expression ? [regexToWildcard((t.expression as Attribute).value)] : [],
-				cql: null,
-				value: null
-			})),
-
-			// tokens: cql.tokens.map()
+			tokens: cql.tokens.map(t => {
+				// the cql token might not always contain an attribute/annotation's value, for example in the case of "[]"
+				// In this case substitute with the main annotation id, usually "word".
+				const editorId= t.expression ? (t.expression as Attribute).name : CorpusModule.get.firstMainAnnotation().id;
+				// Get the editor instance, this contains - for example - the available options if this annotation is configured to be a dropdown.
+				const editorDefinition = AnnotationModule.getState()[editorId];
+				// Get the cql token to extract the value from, this is just a single token in the case of ngrams.
+				// Because each editor governs one cql token position.
+				const cqlTokenToDecode = [t];
+				// And finally extract the value for this editor.
+				const editorValue = this._annotationValue(editorDefinition, cqlTokenToDecode);
+				return editorValue;
+			}),
 		};
 	}
 
@@ -473,7 +478,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	// 	return null;
 	// }
 
-	private _annotationValue(editorDefinition: AnnotationModule.AnnotationEditorDefinition): AnnotationModule.AnnotationEditorInstance {
+	private _annotationValue(editorDefinition: AnnotationModule.AnnotationEditorDefinition, tokens?: Token[]): AnnotationModule.AnnotationEditorInstance {
 		const {componentName, id} = editorDefinition;
 		const vueComponent = Vue.component(componentName) as typeof baseAnnotationEditor;
 
@@ -483,8 +488,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			return {
 				cql: null,
 				id,
-				stringValue: [],
-				value: undefined
+				value: null
 			};
 		}
 
@@ -498,29 +502,30 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			},
 		});
 
-		const componentValue = this._parsedCql ? vueComponentInstance.decodeInitialState(this._parsedCql!.tokens) : null;
+		const componentValue = tokens? vueComponentInstance.decodeInitialState(tokens) : null;
 		const storeValue: AnnotationModule.AnnotationEditorInstance = {
 			cql: null,
 			id,
-			stringValue: [],
 			value: componentValue != null ? componentValue : undefined
 		};
 
 		if (componentValue != null) { // don't overwrite default value
 			Vue.set((vueComponentInstance as any)._props, 'value', componentValue);
 			storeValue.cql = vueComponentInstance.cql;
-			// storeValue.stringValue = vueComponentInstance.stringValue;
 		}
 		return storeValue;
 	}
 
 	@memoize
 	private get annotationValues(): MapOf<AnnotationModule.AnnotationEditorInstance> {
-		const editors: MapOf<AnnotationModule.AnnotationEditorInstance> = PatternModule.getState().extended.annotationEditors;
-		const editorDefinitions: AnnotationModule.AnnotationEditorDefinition[] = Object.keys(editors).map(id => AnnotationModule.getState()[id]);
+		const editorDefs: MapOf<AnnotationModule.AnnotationEditorDefinition> = AnnotationModule.getState();
+		const editors: AnnotationModule.AnnotationEditorInstance[] = Object.values(PatternModule.getState().extended.annotationEditors);
+		const cqlTokens = this._parsedCql ? this._parsedCql.tokens : undefined;
 
 		// Remove editors without a value in them
-		return mapReduce(editorDefinitions.map(def => this._annotationValue(def)).filter(value => !!value.cql), 'id');
+		const editorsWithValues = editors.map(editor => this._annotationValue(editorDefs[editor.id], cqlTokens)).filter(ed => ed.value && ed.cql);
+
+		return mapReduce(editorsWithValues, 'id');
 	}
 
 	@memoize

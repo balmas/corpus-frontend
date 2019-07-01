@@ -46,7 +46,6 @@ const defaults: ModuleRootState = {
 				ret.push({
 					id: defaults.ngram.groupAnnotationId,
 					cql: null,
-					stringValue: [],
 					value: null
 				});
 			}
@@ -74,7 +73,8 @@ const get = {
 	ngram: {
 		size: b.read(state => state.ngram.size, 'ngram_size'),
 		maxSize: b.read(state => state.ngram.maxSize, 'ngram_maxSize'),
-		tokens: b.read(state => state.ngram.tokens.map(t => ({...t, ...AnnotationStore.getState()[t.id]})), 'ngram_tokens'),
+		tokensDefinitions: b.read<AnnotationStore.AnnotationEditorDefinition[]>(state => state.ngram.tokens.map(t => AnnotationStore.getState()[t.id]), 'ngram_token_defs'),
+		tokenValues: b.read<AnnotationStore.AnnotationEditorInstance[]>(state => state.ngram.tokens, 'ngram_tokens'),
 		groupAnnotationId: b.read(state => state.ngram.groupAnnotationId, 'ngram_groupAnnotationId'),
 
 		groupBy: b.read(state => `hit:${state.ngram.groupAnnotationId}`, 'ngram_groupBy'),
@@ -105,7 +105,6 @@ const internalActions = {
 			state.ngram.tokens.push({
 				id,
 				cql: null,
-				stringValue: [],
 				value: null
 			});
 		}
@@ -116,25 +115,15 @@ const actions = {
 	ngram: {
 		size: b.commit((state, payload: number) => state.ngram.size = Math.min(state.ngram.maxSize, payload), 'ngram_size'),
 		tokenType: b.commit((state, payload: {index: number, id: string}) => {
-			// if (payload.index < state.ngram.maxSize) {
-				state.ngram.tokens[payload.index].id = payload.id;
-				state.ngram.tokens[payload.index].value = null;
-				state.ngram.tokens[payload.index].cql = null;
-				// keep stringValue, that's how we (attempt to) transfer values from one editor to another.
-			// }
+			state.ngram.tokens[payload.index].id = payload.id;
+			state.ngram.tokens[payload.index].value = null;
+			state.ngram.tokens[payload.index].cql = null;
 		}, 'ngram_type'),
 		tokenValue: b.commit((state, payload: {index: number, value: Partial<RemoveProperties<AnnotationStore.AnnotationEditorInstance, 'id'>>}) => {
 			if (payload.index < state.ngram.maxSize) {
 				Object.assign(state.ngram.tokens[payload.index], payload.value);
 			}
 		}, 'ngram_value'),
-		// tokenCql: b.commit((state, payload: { index: number, cql: string|string[] }) => {
-		// 	if (payload.index < state.ngram.maxSize) {
-		// 		state.ngram.tokens[payload.index].cql = payload.cql;
-		// 	}
-		// }, 'ngram_cql'),
-		// tokenStringValue: b.commit((state, payload: {index: number, stringValue}))
-
 		groupAnnotationId: b.commit((state, payload: string) => state.ngram.groupAnnotationId = payload, 'ngram_groupAnnotationId'),
 		maxSize: b.commit((state, payload: number) => {
 			state.ngram.size = Math.min(state.ngram.size, payload);
@@ -142,7 +131,6 @@ const actions = {
 			internalActions.fixTokenArray();
 		}, 'ngram_maxSize'),
 
-		// stringify/parse required so we don't alias the default array
 		reset: b.commit(state => Object.assign(state.ngram, cloneDeep(defaults.ngram)), 'ngram_reset'),
 
 		replace: b.commit((state, payload: ModuleRootState['ngram']) => {
