@@ -14,7 +14,6 @@ import * as CorpusModule from '@/store/search/corpus';
 import { FilterDefinition } from '@/types/apptypes';
 
 import { debugLog } from '@/utils/debug';
-import { paths } from '@/api';
 import { RemoveProperties } from '@/types/helpers';
 
 export type AnnotationEditorDefinition = RemoveProperties<FilterDefinition, 'groupId'>;

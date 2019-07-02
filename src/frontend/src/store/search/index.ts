@@ -16,6 +16,7 @@ import * as UIModule from '@/store/search/ui';
 // Form
 import * as FormManager from '@/store/search/form';
 import * as FilterModule from '@/store/search/form/filters';
+import * as AnnotationsModule from '@/store/search/form/annotations';
 import * as InterfaceModule from '@/store/search/form/interface';
 import * as PatternModule from '@/store/search/form/patterns';
 import * as ExploreModule from '@/store/search/form/explore';
@@ -350,6 +351,7 @@ const init = () => {
 	explore: ExploreModule,
 	form: FormManager,
 	filters: FilterModule,
+	annotations: AnnotationsModule,
 	interface: InterfaceModule,
 	patterns: PatternModule,
 	gap: GapModule,

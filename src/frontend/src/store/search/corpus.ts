@@ -3,6 +3,9 @@
  * We use it for pretty much everything to do with layout:
  * which annotations and filters are available, what is the default annotation (lemma/pos/word/etc...),
  * are the filters subdivided in groups, what is the text direction, and so on.
+ *
+ * NOTE: the corpus module (this) should be usable before (and while) the other modules initialize!
+ * This is to make sure we can validate that custom/user js passes in valid annotation/metadata ids etc when it customizes stuff before document.ready!
  */
 
 import {getStoreBuilder} from 'vuex-typex';

@@ -5,8 +5,8 @@ import memoize from 'memoize-decorator';
 import BaseUrlStateParser from '@/store/util/url-state-parser-base';
 import LuceneQueryParser from 'lucene-query-parser';
 
-import { mapReduce, MapOf, regexToWildcard } from '@/utils';
-import parseCql, {Attribute} from '@/utils/cqlparser';
+import { mapReduce, MapOf, regexToWildcard, unescapeRegex, wildcardToRegex } from '@/utils';
+import parseCql, {Attribute, BinaryOp} from '@/utils/cqlparser';
 import parseLucene from '@/utils/luceneparser';
 import { debugLog } from '@/utils/debug';
 
@@ -168,39 +168,9 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			// Can't parse from url, instead determine the best state based on other parameters.
 			const ui = InterfaceModule.defaults;
 
-			// show the pattern view that can hold the query
-			// the other views will have the query placed in it as well (if it fits), but this is more of a courtesy
-			// if no pattern exists, show the simplest search
-			const hasFilters = Object.keys(this.filters).length > 0;
-			const hasGapValue = !!this.gap.value; // Only supported for expert view for, prevent setting anything else for now
-			let fromPattern = true; // is interface state actually from the pattern, or from the default fallback?
-			if (this.simplePattern && !hasFilters && !hasGapValue) {
-				ui.patternMode = 'simple';
-			} else if ((Object.keys(this.extendedPattern.annotationEditors).length > 0) && !hasGapValue) {
-				ui.patternMode = 'extended';
-			} else if (this.advancedPattern && !hasGapValue) {
-				ui.patternMode = 'advanced';
-			} else if (this.expertPattern) {
-				ui.patternMode = 'expert';
-			} else {
-				ui.patternMode = hasFilters ? hasGapValue ? 'expert' : 'extended' : 'simple';
-				fromPattern = false;
-			}
-
+			ui.patternMode = this.expertPattern ? 'expert' : 'simple';
 			// Open any results immediately?
 			ui.viewedResults = this.viewedResults;
-
-			// Explore forms have priority over normal search form
-			if (this.frequencies != null) {
-				ui.form = 'explore';
-				ui.exploreMode = 'frequency';
-			} else if (this.ngrams != null && !(fromPattern && ui.patternMode === 'simple')) {
-				ui.form = 'explore';
-				ui.exploreMode = 'ngram';
-			} else if (this.corpora != null) {
-				ui.form = 'explore';
-				ui.exploreMode = 'corpora';
-			}
 
 			return ui;
 		}
@@ -266,7 +236,12 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			return null;
 		}
 
-		const cql = this._parsedCql;
+		// so this contains the tokens if there are no weird logic groups in logic groups
+		// otherwise, whatever
+		// so pass this into the annotations
+		const cql = this._simplifiedQuery;
+
+
 		if ( // all tokens need to be very simple [annotation="value"] tokens.
 			!cql ||
 			cql.within ||
@@ -335,6 +310,90 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	@memoize
 	private get pageSize(): number {
 		return this.getNumber('number', GlobalResultsModule.defaults.pageSize, v => [20,50,100,200].includes(v) ? v : GlobalResultsModule.defaults.pageSize)!;
+	}
+
+	/**
+	 * Decode the query into tokens where every annotation is AND'ed together, and all values within an annotation are OR'ed together.
+	 * If this fails at any point, the entire query is considered "complex" and this becomed null.
+	 * That means that a token containing something like word="a"|lemma="a" cannot be simplified by this function and will be represented with a null
+	 * while there may be an actual token.
+	 */
+	@memoize
+	private get _simplifiedQuery(): null|Array<{
+		[annotationId: string]: string;
+	}|null> {
+		const result = this._parsedCql;
+		if (result == null) {
+			return null;
+		}
+
+		return result.tokens.map<MapOf<string>|null>(t => {
+			if (t.leadingXmlTag || t.optional || t.repeats || t.trailingXmlTag) {
+				return null;
+			}
+
+			function isTreeCombinedUsing(o: BinaryOp, op: BinaryOp['operator']): boolean {
+				return (
+					o.operator === op &&
+					(o.left.type !== 'binaryOp' || isTreeCombinedUsing(o.left, op)) &&
+					(o.right.type !== 'binaryOp' || isTreeCombinedUsing(o.right, op))
+				);
+			}
+
+			function isAllLeavesSameAnnotation(o: BinaryOp|Attribute, annotation: string): boolean {
+				return (
+					(o.type === 'binaryOp' && isAllLeavesSameAnnotation(o.left, annotation) && isAllLeavesSameAnnotation(o.right, annotation)) ||
+					(o.type === 'attribute' && o.name === annotation)
+				);
+			}
+
+			function getLeftmostAnnotation(o: BinaryOp|Attribute): string {
+				return o.type === 'binaryOp' ? getLeftmostAnnotation(o) : o.name;
+			}
+
+			function extractAnnotationValues(o: BinaryOp|Attribute, context: MapOf<string[]>) {
+				if (o.type === 'attribute') {
+					const value = regexToWildcard(o.value);
+					(o.name in context) ? context[o.name].push(value) : context[o.name] = [value];
+				} else {
+					extractAnnotationValues(o.left, context);
+					extractAnnotationValues(o.right, context);
+				}
+			}
+
+			function descend(o: BinaryOp|Attribute, context: MapOf<string[]>) {
+				if (o.type === 'attribute') {
+					extractAnnotationValues(o, context);
+				} else {
+					if (o.operator === '&') {
+						descend(o, context);
+					} else {
+						const annot = getLeftmostAnnotation(o);
+						if (!isAllLeavesSameAnnotation(o, annot)) {
+							throw new Error('Cannot parse simple query, annotations combined using |');
+						}
+						if (!isTreeCombinedUsing(o, '|')) {
+							throw new Error('Cannot parse simple query, annotations combined using & below a |');
+						}
+						extractAnnotationValues(o, context);
+					}
+				}
+			}
+
+			const ctx = {};
+			if (!t.expression) {
+				return ctx;
+			}
+
+			try {
+				descend(t.expression, ctx);
+				return ctx;
+			} catch (e) {
+				// tslint:disable-next-line
+				console.warn(e);
+				return null;
+			}
+		});
 	}
 
 	// @memoize

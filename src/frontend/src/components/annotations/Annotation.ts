@@ -33,6 +33,10 @@ const baseAnnotationEditor = Vue.extend({
 		 * If the query could not be decoded, null should be returned.
 		 */
 		decodeInitialState(ast: Token[]): any { throw new Error('missing decodeInitialState() implementation in annotation editor'); },
+
+		// -- utils --
+		isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); },
+		stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
 	},
 	computed: {
 		id(): string { return this.definition.id + (this as any).uid; },

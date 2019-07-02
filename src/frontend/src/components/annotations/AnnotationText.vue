@@ -81,8 +81,12 @@ export default BaseAnnotationEditor.extend({
 		metadata(): Metadata { return this.definition.metadata as Metadata; },
 		cql(): string|string[]|null {
 			const {value, caseSensitive} = this.value as Value;
+			if (!value && !value.trim()) {
+				return null;
+			}
 
 			let resultParts = value
+			.trim()
 			.split(/"/)
 			.flatMap((v, i) => {
 				if (!v) {
@@ -121,7 +125,7 @@ export default BaseAnnotationEditor.extend({
 				// tslint:disable-next-line
 				while (exp = stack.shift()) {
 					if (exp.type === 'binaryOp') {
-						if (exp.operator !== 'AND' && exp.operator !== '&') {
+						if (exp.operator !== '&') {
 							// Clauses combined in an unsupported way, cannot parse.
 							return undefined;
 						}

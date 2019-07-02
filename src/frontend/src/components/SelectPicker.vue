@@ -6,7 +6,16 @@
 		@keydown.prevent.down="focusDown"
 		@keydown.prevent.up="focusUp"
 	>
-		<input v-if="editable"
+		<input v-if="editable && multiple"
+			:class="dataClass || 'form-control'"
+			:style="dataStyle"
+			title="Editable and Multiple are not supported on the same selectpicker!"
+			value="Editable and Multiple are not supported on the same selectpicker!"
+			style="background-color: #f2dede; border-color: #ebccd1; color: #a94442;"
+
+			disabled
+		>
+		<input v-else-if="editable"
 			:class="['menu-input', dataClass || 'form-control']"
 			:id="dataId"
 			:name="dataName"

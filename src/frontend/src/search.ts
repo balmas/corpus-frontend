@@ -130,7 +130,9 @@ Vue.use(VTooltip, {
 });
 
 $(document).ready(() => {
+	debugLog('Initializing vuex store...');
 	RootStore.init();
+	debugLog('Finished initializing vuex store');
 
 	// We can render before the tagset loads, the form just won't be populated from the url yet.
 	(window as any).vueRoot = new Vue({

@@ -19,8 +19,7 @@ export type Attribute = {
 
 export type BinaryOp = {
 	type: 'binaryOp';
-	/** typically 'OR', 'AND', '|', '&' */
-	operator: string;
+	operator: '|'|'&';
 	left: BinaryOp|Attribute;
 	right: BinaryOp|Attribute;
 };
@@ -184,8 +183,8 @@ export default function(input: string, defaultAttribute = DEFAULT_ATTRIBUTE): Re
 
 	function parseExpression() {
 		let left = parsePredicate();
-		while (test('&', '|')) {
-			const op = cur;
+		while (test('&', '|')) { // equal to BinaryOp['operator']
+			const op = cur as '|'|'&';
 			nextSym();
 			const right = parsePredicate();
 

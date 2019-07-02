@@ -21,6 +21,9 @@ export function regexToWildcard(original: string) {
 	.replace(/_ESC_PERIOD_/g, '.'); // unescape \. to .
 }
 
+export const escapeRegex = (original: string) => original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+export const unescapeRegex = (original: string) => original.replace(/\\([.*+?${}()|[\]\\])/g, '$1');
+
 /**
  * Escapes the lucene term. This is done by surrounding it by quotes, unless wildcards (* and ?) should be preserved,
  * in which case characters are escaped on an individual basis.
@@ -186,7 +189,7 @@ export const getPatternString = (annotationEditors: AnnotationEditorInstance[], 
 	annotationEditors = annotationEditors.filter(ed => ed.cql != null && ed.cql.length).sort((a, b) => a.id.localeCompare(b.id));
 
 	/** A token is just a collection of cql snippets, so a string[]. There might be multiple tokens, so string[][] */
-	const tokenArray: string[][] = [];
+	const tokenArray: string[][] = []; // always start with one token
 	/**
 	 * Some editors only produce one value, in that case, that value should be used in every token.
 	 * Store these values here until we have processed all other values, so we know how many tokens there are.
@@ -208,6 +211,9 @@ export const getPatternString = (annotationEditors: AnnotationEditorInstance[], 
 		}
 	});
 
+	if (tokenArray.length === 0 && valuesForEveryToken.length > 0) {
+		tokenArray.push([]);
+	}
 	tokenArray.forEach(tokenValues => tokenValues.push(...valuesForEveryToken));
 
 	const query = tokenArray.map(token => `[${token.join(' & ')}]`).join('');

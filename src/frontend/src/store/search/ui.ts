@@ -5,12 +5,14 @@
  * Functionality may be moved in/out of this module depending on long-term use.
  *
  * Configure from external javascript through window.vuexModules.ui.getState() and assign things.
+ *
+ * NOTE: this module is used before the store is initialized!
  */
 
 import cloneDeep from 'clone-deep';
 import {getStoreBuilder} from 'vuex-typex';
 
-import {RootState} from '@/store/search/';
+import { RootState } from '@/store/search/';
 import * as CorpusStore from '@/store/search/corpus';
 import * as BLTypes from '@/types/blacklabtypes';
 import { mapReduce } from '@/utils';
