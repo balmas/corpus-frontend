@@ -170,15 +170,12 @@ const actions = {
 	expert: b.commit((state, payload: string|null) => state.expert = payload, 'expert'),
 
 	reset: b.commit(state => {
-		// state.simple = null;
-		actions.extended.reset();
-		state.advanced = null;
-		state.expert = null;
+		actions.replace(cloneDeep(defaults));
 	}, 'reset'),
 
 	replace: b.commit((state, payload: ModuleRootState) => {
-		actions.simple.annotationEditorCql(payload.simple!.cql);
-		actions.simple.annotationEditorValue(payload.simple!.value);
+		actions.simple.annotationEditorCql(payload.simple && payload.simple.cql);
+		actions.simple.annotationEditorValue(payload.simple && payload.simple.value);
 		actions.advanced(payload.advanced);
 		actions.expert(payload.expert);
 		actions.extended.reset();

@@ -35,6 +35,10 @@ import baseAnnotationEditor, { SimpleCqlToken } from '@/components/annotations/A
 import { Token } from '@/utils/cqlparser';
 import cloneDeep from 'clone-deep';
 
+// TODO: this now accesses the AnnotationStore, PatternStore and ExploreStore to decode the cql query
+// (because the decoding is based on which annoation editors are configured - which is contained in those stores)
+// clean this up!
+
 /**
  * Decode the current url into a valid page state configuration.
  * Keep everything private except the getters
@@ -314,7 +318,6 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	 */
 	@memoize
 	private get _simplifiedQuery(): null|SimpleCqlToken[] {
-		debugger;
 		const parsedCql = this._parsedCql;
 		if (!parsedCql) {
 			return null;
@@ -391,7 +394,6 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 				.map(id => this._annotationValue(editorDefs[id], true, simpleCqlTokens, cqlTokens))
 				.filter(decodedEditorState => decodedEditorState.value && decodedEditorState.cql);
 
-			debugger;
 			return mapReduce(editorValues, 'id');
 		} else {
 			return {};
