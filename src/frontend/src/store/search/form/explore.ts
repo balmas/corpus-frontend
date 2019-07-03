@@ -115,9 +115,11 @@ const actions = {
 	ngram: {
 		size: b.commit((state, payload: number) => state.ngram.size = Math.min(state.ngram.maxSize, payload), 'ngram_size'),
 		tokenType: b.commit((state, payload: {index: number, id: string}) => {
-			state.ngram.tokens[payload.index].id = payload.id;
-			state.ngram.tokens[payload.index].value = null;
-			state.ngram.tokens[payload.index].cql = null;
+			if (state.ngram.tokens[payload.index].id !== payload.id) { // don't just clear value, this might happen during initialization
+				state.ngram.tokens[payload.index].id = payload.id;
+				state.ngram.tokens[payload.index].value = null;
+				state.ngram.tokens[payload.index].cql = null;
+			}
 		}, 'ngram_type'),
 		tokenValue: b.commit((state, payload: {index: number, value: Partial<RemoveProperties<AnnotationStore.AnnotationEditorInstance, 'id'>>}) => {
 			if (payload.index < state.ngram.maxSize) {

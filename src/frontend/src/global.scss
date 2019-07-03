@@ -136,8 +136,14 @@ ul.nav-tabs.cf-panel-tab-header {
 	z-index: 1000;
 }
 
-.disabled > label {
-	color: hsl(0, 0%, 42%);
+.disabled > label,
+label.disabled {
+	// color: hsl(0, 0%, 42%);
+	opacity: 0.65;
+
+	&[for] {
+		cursor: not-allowed;
+	}
 }
 
 // We usually wrap file inputs in labels to style them better

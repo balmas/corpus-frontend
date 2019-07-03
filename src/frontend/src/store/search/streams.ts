@@ -23,7 +23,6 @@ import * as Api from '@/api';
 import * as BLTypes from '@/types/blacklabtypes';
 import jsonStableStringify from 'json-stable-stringify';
 import { debugLog } from '@/utils/debug';
-import { Cancel } from 'axios';
 
 type QueryState = {
 	params?: BLTypes.BLSearchParameters,
@@ -167,7 +166,7 @@ url$.pipe(
 
 		// Remove null, undefined, empty strings and empty arrays from our query params
 		// Any missing/omitted parameters in the (frontend) url will be replaced by their defaults by the url-state-parser when the url might be decoded.
-		const queryParams: Partial<BLTypes.BLSearchParameters> = Object.entries(v.params).reduce((acc, [key, val]) => {
+		const urlParams: Partial<BLTypes.BLSearchParameters> = Object.entries(v.params).reduce((acc, [key, val]) => {
 			if (val == null) { return acc; }
 			if (typeof val === 'string' && val.length === 0) { return acc; }
 			if (Array.isArray(val) && val.length === 0) { return acc; }
@@ -180,25 +179,31 @@ url$.pipe(
 		// even when loading the page from just the url. See UrlStateParser class in store/utils/url-state-parser.ts
 		// TODO we should probably output the form in the url as /${indexId}/('search'|'explore')/('simple'|'advanced' ...etc)/('hits'|'docs')
 		const {viewedResults} = v.state.interface;
-		Object.assign(queryParams, {
-			interface: JSON.stringify({
-				form: v.state.query.form,
-				exploreMode: v.state.query.form === 'explore' ? v.state.query.subForm : undefined, // remove if not relevant
-				patternMode: v.state.query.form === 'search' ? v.state.query.subForm : undefined, // remove if not relevant
-				viewedResults: undefined, // remove from query parameters: is encoded in path (segmentcoded)
-			} as Partial<InterfaceStore.ModuleRootState>),
-			groupDisplayMode: v.state[viewedResults!].groupDisplayMode || undefined // remove null
-		});
+		Object.assign(
+			urlParams,
+			{
+				interface: JSON.stringify({
+					form: v.state.query.form,
+					exploreMode: v.state.query.form === 'explore' ? v.state.query.subForm : undefined, // remove if not relevant
+					patternMode: v.state.query.form === 'search' ? v.state.query.subForm : undefined, // remove if not relevant
+					viewedResults: undefined, // remove from query parameters: is encoded in path (segmentcoded)
+				} as Partial<InterfaceStore.ModuleRootState>),
+				groupDisplayMode: v.state[viewedResults!].groupDisplayMode || undefined, // remove null
+				ngramEditorIds: v.state.query.form === 'explore' && v.state.query.subForm === 'ngram'
+					? JSON.stringify((v.state.query.formState as ExploreStore.ModuleRootState['ngram']).tokens.map(t => t.id))
+					: undefined,
+			}
+		);
 
 		// Generate the new frontend url
 		const uri2 = uri
 			.segmentCoded(basePath)
 			.segmentCoded(v.state.interface.viewedResults!)
-			.search(queryParams);
+			.search(urlParams);
 
 		const fullUrl = uri2.toString();
 		return {
-			url: fullUrl.length <= 4000 ? fullUrl : uri2.search(Object.assign({}, queryParams, {patt: undefined, pattgapdata: undefined})).toString(),
+			url: fullUrl.length <= 4000 ? fullUrl : uri2.search(Object.assign({}, urlParams, {patt: undefined, pattgapdata: undefined})).toString(),
 			isTruncated: fullUrl.length > 4000,
 			state: v.state,
 			params: v.params

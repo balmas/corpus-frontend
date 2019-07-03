@@ -1,5 +1,4 @@
 import URI from 'urijs';
-import memoize from 'memoize-decorator';
 
 /**
  * Decode the current url into a valid page state configuration.
@@ -68,5 +67,14 @@ export default abstract class UrlStateParser<T> {
 		} else {
 			return fallback;
 		}
+	}
+
+	protected getArray(paramname: string, fallback: string[]|null, validate?: (value: string[])=>string[]): string[]|null {
+		let {[paramname]: prop} = this.params;
+		if (!Array.isArray(prop) && prop != null) {
+			prop = [prop];
+		}
+
+		return prop != null ? validate ? validate(prop) : prop : fallback;
 	}
 }

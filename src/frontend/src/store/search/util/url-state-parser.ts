@@ -31,8 +31,9 @@ import * as HitResultsModule from '@/store/search/results/hits';
 import { FilterValue } from '@/types/apptypes';
 
 import BaseFilter from '@/components/filters/Filter';
-import baseAnnotationEditor from '@/components/annotations/Annotation';
+import baseAnnotationEditor, { SimpleCqlToken } from '@/components/annotations/Annotation';
 import { Token } from '@/utils/cqlparser';
+import cloneDeep from 'clone-deep';
 
 /**
  * Decode the current url into a valid page state configuration.
@@ -231,50 +232,44 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 			return null;
 		}
 
-		const annotationId = group.substring(4);
-		if (!CorpusModule.get.annotationDisplayNames().hasOwnProperty(annotationId)) {
+		const groupAnnotationId = group.substring(4);
+		if (!CorpusModule.get.annotationDisplayNames().hasOwnProperty(groupAnnotationId)) {
 			return null;
 		}
 
-		// so this contains the tokens if there are no weird logic groups in logic groups
-		// otherwise, whatever
-		// so pass this into the annotations
-		const cql = this._simplifiedQuery;
-
-
-		if ( // all tokens need to be very simple [annotation="value"] tokens.
-			!cql ||
-			cql.within ||
-			cql.tokens.length > ExploreModule.defaults.ngram.maxSize ||
-			cql.tokens.find(t =>
-				t.leadingXmlTag != null ||
-				t.trailingXmlTag != null ||
-				t.repeats != null ||
-				t.optional ||
-				(t.expression != null && (t.expression.type !== 'attribute' || t.expression.operator !== '='))
-			) != null
-		) {
+		const cql = this._parsedCql;
+		const simplecql = this._simplifiedQuery;
+		// all tokens need to  [annotation="value"] tokens.
+		if (!cql || !simplecql || cql.within) {
 			return null;
 		}
 
-		// Alright, seems we're all good.
+		const availableAnnotationEditors = AnnotationModule.getState();
+		const ngramEditorIds = JSON.parse(this.getString('ngramEditorIds', 'null')!);
+		if (!ngramEditorIds || !Array.isArray(ngramEditorIds)) {
+			return null;
+		}
+		for (const id of ngramEditorIds) {
+			if (!availableAnnotationEditors[id]) {
+				console.warn(`Trying to parse ngram created with editor ${id}, but it doesn't exist, are you registering it in custom js?`);
+				return null;
+			}
+		}
+
+		const parseUntil = Math.min(ngramEditorIds.length, simplecql.length, cql.tokens.length);
+		if (parseUntil === 0) {
+			return null;
+		}
+		const editorValues: AnnotationModule.AnnotationEditorInstance[] = []
+		for (let i = 0; i < parseUntil; ++i) {
+			editorValues.push(this._annotationValue(availableAnnotationEditors[ngramEditorIds[i]], false, [simplecql[i]], [cql.tokens[i]]))
+		}
+
 		return {
-			groupAnnotationId: annotationId,
+			groupAnnotationId,
 			maxSize: ExploreModule.defaults.ngram.maxSize,
-			size: cql.tokens.length,
-			tokens: cql.tokens.map(t => {
-				// the cql token might not always contain an attribute/annotation's value, for example in the case of "[]"
-				// In this case substitute with the main annotation id, usually "word".
-				const editorId= t.expression ? (t.expression as Attribute).name : CorpusModule.get.firstMainAnnotation().id;
-				// Get the editor instance, this contains - for example - the available options if this annotation is configured to be a dropdown.
-				const editorDefinition = AnnotationModule.getState()[editorId];
-				// Get the cql token to extract the value from, this is just a single token in the case of ngrams.
-				// Because each editor governs one cql token position.
-				const cqlTokenToDecode = [t];
-				// And finally extract the value for this editor.
-				const editorValue = this._annotationValue(editorDefinition, cqlTokenToDecode);
-				return editorValue;
-			}),
+			size: editorValues.length,
+			tokens: editorValues,
 		};
 	}
 
@@ -313,231 +308,37 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	}
 
 	/**
-	 * Decode the query into tokens where every annotation is AND'ed together, and all values within an annotation are OR'ed together.
-	 * If this fails at any point, the entire query is considered "complex" and this becomed null.
-	 * That means that a token containing something like word="a"|lemma="a" cannot be simplified by this function and will be represented with a null
-	 * while there may be an actual token.
+	 * Decode the query ignoring all of the combining operators.
+	 * Just extract all values for all annotations and stick them in arrays.
+	 * Also ignores all metadata about tokens, such as repeating clauses and such.
 	 */
 	@memoize
-	private get _simplifiedQuery(): null|Array<{
-		[annotationId: string]: string;
-	}|null> {
-		const result = this._parsedCql;
-		if (result == null) {
+	private get _simplifiedQuery(): null|SimpleCqlToken[] {
+		debugger;
+		const parsedCql = this._parsedCql;
+		if (!parsedCql) {
 			return null;
 		}
 
-		return result.tokens.map<MapOf<string>|null>(t => {
-			if (t.leadingXmlTag || t.optional || t.repeats || t.trailingXmlTag) {
-				return null;
-			}
+		return parsedCql.tokens.map(t => {
+			const context: MapOf<string[]> = {};
 
-			function isTreeCombinedUsing(o: BinaryOp, op: BinaryOp['operator']): boolean {
-				return (
-					o.operator === op &&
-					(o.left.type !== 'binaryOp' || isTreeCombinedUsing(o.left, op)) &&
-					(o.right.type !== 'binaryOp' || isTreeCombinedUsing(o.right, op))
-				);
-			}
-
-			function isAllLeavesSameAnnotation(o: BinaryOp|Attribute, annotation: string): boolean {
-				return (
-					(o.type === 'binaryOp' && isAllLeavesSameAnnotation(o.left, annotation) && isAllLeavesSameAnnotation(o.right, annotation)) ||
-					(o.type === 'attribute' && o.name === annotation)
-				);
-			}
-
-			function getLeftmostAnnotation(o: BinaryOp|Attribute): string {
-				return o.type === 'binaryOp' ? getLeftmostAnnotation(o) : o.name;
-			}
-
-			function extractAnnotationValues(o: BinaryOp|Attribute, context: MapOf<string[]>) {
-				if (o.type === 'attribute') {
-					const value = regexToWildcard(o.value);
-					(o.name in context) ? context[o.name].push(value) : context[o.name] = [value];
+			const stack = [t.expression!];
+			let cur: (typeof stack)[number];
+			// tslint:disable-next-line
+			while (cur = stack.shift()!) {
+				if (cur.type === 'binaryOp') {
+					stack.push(cur.left, cur.right);
 				} else {
-					extractAnnotationValues(o.left, context);
-					extractAnnotationValues(o.right, context);
+					const value = cur.value;
+					context[cur.name] ? context[cur.name].push(cur.value) : context[cur.name] = [value];
 				}
 			}
-
-			function descend(o: BinaryOp|Attribute, context: MapOf<string[]>) {
-				if (o.type === 'attribute') {
-					extractAnnotationValues(o, context);
-				} else {
-					if (o.operator === '&') {
-						descend(o, context);
-					} else {
-						const annot = getLeftmostAnnotation(o);
-						if (!isAllLeavesSameAnnotation(o, annot)) {
-							throw new Error('Cannot parse simple query, annotations combined using |');
-						}
-						if (!isTreeCombinedUsing(o, '|')) {
-							throw new Error('Cannot parse simple query, annotations combined using & below a |');
-						}
-						extractAnnotationValues(o, context);
-					}
-				}
-			}
-
-			const ctx = {};
-			if (!t.expression) {
-				return ctx;
-			}
-
-			try {
-				descend(t.expression, ctx);
-				return ctx;
-			} catch (e) {
-				// tslint:disable-next-line
-				console.warn(e);
-				return null;
-			}
+			return context;
 		});
 	}
 
-	// @memoize
-	// private get annotationValues(): {[key: string]: AnnotationValue} {
-	// 	function isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); }
-	// 	function stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
-
-	// 	// How we parse the cql pattern depends on whether a tagset is available for this corpus, and whether it's enabled in the ui
-	// 	if (!(TagsetModule.getState().state === 'loaded' || TagsetModule.getState().state === 'disabled')) {
-	// 		throw new Error('Attempting to parse url before tagset is loaded or disabled, await tagset.awaitInit() before parsing url.');
-	// 	}
-
-	// 	const result = this._parsedCql;
-	// 	if (result == null) {
-	// 		return {};
-	// 	}
-
-	// 	const tagsetInfo = TagsetModule.getState().state === 'loaded' ? {
-	// 		mainAnnotations: CorpusModule.get.annotations().filter(a => a.uiType === 'pos').map(a => a.id),
-	// 		subAnnotations: Object.keys(TagsetModule.getState().subAnnotations)
-	// 	} : null;
-
-	// 	try {
-	// 		/**
-	// 		 * A requirement of the PropertyFields is that there are no gaps in the values
-	// 		 * So a valid config is
-	// 		 * ```
-	// 		 * lemma: [these, are, words]
-	// 		 * word: [these, are, other, words]
-	// 		 * ```
-	// 		 * And an invalid config is
-	// 		 * ```
-	// 		 * lemma: [gaps, are, , not, allowed]
-	// 		 * ```
-	// 		 * Not all properties need to have the same number of values though,
-	// 		 * shorter lists are implicitly treated as having wildcards for the remainder of values. (see getPatternString())
-	// 		 *
-	// 		 * Store the values here while parsing.
-	// 		 */
-	// 		const knownAnnotations = CorpusModule.get.annotationDisplayNames();
-
-	// 		const annotationValues: {[key: string]: string[]} = {};
-	// 		for (let i = 0; i < result.tokens.length; ++i) {
-	// 			const token = result.tokens[i];
-	// 			if (token.leadingXmlTag || token.optional || token.repeats || token.trailingXmlTag) {
-	// 				throw new Error('Token contains settings too complex for simple search');
-	// 			}
-
-	// 			// Use a stack instead of direct recursion to simplify code
-	// 			const stack = token.expression ? [token.expression] : [];
-	// 			while (stack.length) {
-	// 				const expr = stack.shift()!;
-	// 				if (expr.type === 'attribute') {
-	// 					const name = expr.name;
-	// 					if (knownAnnotations[name] == null) {
-	// 						debugLog(`Encountered unknown cql field ${name} while decoding query from url, ignoring.`);
-	// 						continue;
-	// 					}
-
-	// 					const isMainTagsetAnnotation = tagsetInfo && tagsetInfo.mainAnnotations.includes(name);
-	// 					const isTagsetAnnotation = isMainTagsetAnnotation || (tagsetInfo && tagsetInfo.subAnnotations.includes(name));
-
-	// 					if (isTagsetAnnotation) {
-	// 						// add value as original cql-query substring to the main tagset annotation under which the values should be stored.
-	// 						debugLog('Relocating value for annotation ' + name + ' to tagset annotation(s) ' + tagsetInfo!.mainAnnotations);
-	// 						const originalValue = `${name}="${expr.value}"`;
-
-	// 						for (const id of tagsetInfo!.mainAnnotations) {
-	// 							const valuesForAnnotation = annotationValues[id] = annotationValues[id] || [];
-	// 							// keep main annotation at the start
-	// 							isMainTagsetAnnotation ? valuesForAnnotation.unshift(originalValue) : valuesForAnnotation.push(originalValue);
-	// 						}
-	// 					} else {
-	// 						// otherwise just store wherever it should be in the store.
-	// 						const values = annotationValues[name] = annotationValues[name] || [];
-	// 						if (expr.operator !== '=') {
-	// 							throw new Error(`Unsupported comparator for property ${name} on token ${i} for query ${this.expertPattern}, only "=" is supported.`);
-	// 						}
-	// 						if (values.length !== i) {
-	// 							throw new Error(`Property ${name} contains gaps in value for query ${this.expertPattern}`);
-	// 						}
-	// 						values.push(expr.value);
-	// 					}
-
-	// 				} else if (expr.type === 'binaryOp') {
-	// 					if (!(expr.operator === '&' || expr.operator === 'AND')) {
-	// 						throw new Error(`Properties on token ${i} are combined using unsupported operator ${expr.operator} in query ${this.expertPattern}, only AND/& operator is supported.`);
-	// 					}
-
-	// 					stack.push(expr.left, expr.right);
-	// 				}
-	// 			}
-	// 		}
-
-	// 		/**
-	// 		 * Build the actual PropertyFields.
-	// 		 * Convert from regex back into pattern globs, extract case sensitivity.
-	// 		 */
-	// 		return Object.entries(annotationValues).map<AnnotationValue>(([id, values]) => {
-	// 			if (tagsetInfo && tagsetInfo.mainAnnotations.includes(id)) {
-	// 				// use value as-is, already contains cql and should not have wildcards substituted.
-	// 				debugLog('Mapping tagset annotation back to cql: ' + id + ' with values ' + values);
-
-	// 				return {
-	// 					id,
-	// 					case: false,
-	// 					value: values.join('&'),
-	// 				};
-	// 			}
-
-	// 			const caseSensitive = values.every(isCase);
-	// 			if (caseSensitive) {
-	// 				values = values.map(stripCase);
-	// 			}
-	// 			return {
-	// 				id,
-	// 				case: caseSensitive,
-	// 				value: makeRegexWildcard(values.join(' '))
-	// 			} as AnnotationValue;
-	// 		})
-	// 		.reduce((acc, v) => {acc[v.id] = v; return acc;}, {} as {[key: string]: AnnotationValue});
-	// 	} catch (error) {
-	// 		debugLog('Cql query could not be placed in extended view', error);
-	// 		return {};
-	// 	}
-	// }
-
-	// @memoize
-	// private get simplePattern(): string|null {
-	// 	// Simple view is just a subset of extended view
-	// 	// So we can just check if extended fits into simple
-	// 	// then we get wildcard conversion etc for free.
-	// 	// (simple/extended view have their values processed when converting to query - see utils::getPatternString,
-	// 	// and this needs to be undone too)
-	// 	const extended = this.extendedPattern;
-	// 	const vals = Object.values(this.extendedPattern.annotationValues);
-	// 	if (extended.within == null && vals.length === 1 && vals[0].id === CorpusModule.get.firstMainAnnotation().id && !vals[0].case) {
-	// 		return vals[0].value;
-	// 	}
-
-	// 	return null;
-	// }
-
-	private _annotationValue(editorDefinition: AnnotationModule.AnnotationEditorDefinition, tokens?: Token[]): AnnotationModule.AnnotationEditorInstance {
+	private _annotationValue(editorDefinition: AnnotationModule.AnnotationEditorDefinition, parseMultipleTokens: boolean, simpleTokens: SimpleCqlToken[], tokens: Token[]): AnnotationModule.AnnotationEditorInstance {
 		const {componentName, id} = editorDefinition;
 		const vueComponent = Vue.component(componentName) as typeof baseAnnotationEditor;
 
@@ -558,14 +359,15 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 				value: undefined,
 				textDirection: CorpusModule.getState().textDirection,
 				definition: editorDefinition,
+				outputMultipleTokens: parseMultipleTokens
 			},
 		});
 
-		const componentValue = tokens? vueComponentInstance.decodeInitialState(tokens) : null;
+		const componentValue = tokens ? vueComponentInstance.decodeInitialState(cloneDeep(simpleTokens), cloneDeep(tokens)) : null;
 		const storeValue: AnnotationModule.AnnotationEditorInstance = {
 			cql: null,
 			id,
-			value: componentValue != null ? componentValue : undefined
+			value: componentValue ? componentValue : null // take care not to store undefined or we lose store reactivity!
 		};
 
 		if (componentValue != null) { // don't overwrite default value
@@ -578,13 +380,22 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	@memoize
 	private get annotationValues(): MapOf<AnnotationModule.AnnotationEditorInstance> {
 		const editorDefs: MapOf<AnnotationModule.AnnotationEditorDefinition> = AnnotationModule.getState();
-		const editors: AnnotationModule.AnnotationEditorInstance[] = Object.values(PatternModule.getState().extended.annotationEditors);
-		const cqlTokens = this._parsedCql ? this._parsedCql.tokens : undefined;
+		const editorIdsInUse = Object.keys(PatternModule.getState().extended.annotationEditors);
 
-		// Remove editors without a value in them
-		const editorsWithValues = editors.map(editor => this._annotationValue(editorDefs[editor.id], cqlTokens)).filter(ed => ed.value && ed.cql);
+		const simpleCqlTokens = this._simplifiedQuery;
+		const cqlTokens = this._parsedCql ? this._parsedCql.tokens : null;
 
-		return mapReduce(editorsWithValues, 'id');
+		if (simpleCqlTokens && cqlTokens) {
+			const editorValues: AnnotationModule.AnnotationEditorInstance[] =
+				editorIdsInUse
+				.map(id => this._annotationValue(editorDefs[id], true, simpleCqlTokens, cqlTokens))
+				.filter(decodedEditorState => decodedEditorState.value && decodedEditorState.cql);
+
+			debugger;
+			return mapReduce(editorValues, 'id');
+		} else {
+			return {};
+		}
 	}
 
 	@memoize
@@ -592,7 +403,16 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 		const editorId = PatternModule.getState().simple!.id;
 		const editorDefinition = AnnotationModule.getState()[editorId];
 
-		return this._annotationValue(editorDefinition);
+		const simpleCqlTokens = this._simplifiedQuery;
+		const cqlTokens = this._parsedCql ? this._parsedCql.tokens : null;
+
+		return simpleCqlTokens && cqlTokens
+			? this._annotationValue(editorDefinition, true, simpleCqlTokens, cqlTokens)
+			: {
+				id: editorId,
+				cql: null,
+				value: null
+			};
 	}
 
 	@memoize

@@ -11,8 +11,9 @@
 				:name="inputId"
 				:placeholder="definition.displayName"
 				:dir="textDirection"
+				:disabled="lexiconValue"
 
-				:value="value.value"
+				:value="lexiconValue ? lexiconValue : value"
 				@input="lemma$.next($event.target.value); e_input($event.target.value);"
 			/>
 			<SelectPicker
@@ -46,7 +47,7 @@
 </template>
 
 <script lang="ts">
-import BaseAnnotationEditor from '@/components/annotations/Annotation';
+import BaseAnnotationEditor, { SimpleCqlToken } from '@/components/annotations/Annotation';
 import SelectPicker from '@/components/SelectPicker.vue';
 
 import { escapeLucene, MapOf, unescapeLucene, regexToWildcard, wildcardToRegex, escapeRegex, unescapeRegex } from '@/utils';
@@ -55,7 +56,7 @@ import { AnnotationEditorDefinition } from '@/store/search/form/annotations';
 import { Token, BinaryOp, Attribute } from '@/utils/cqlparser';
 import { debugLog } from '@/utils/debug';
 import * as Observable from 'rxjs';
-import { map, switchMap, debounce, debounceTime, materialize, catchError, mapTo, tap } from 'rxjs/operators';
+import { map, switchMap, debounce, debounceTime, materialize, catchError, mapTo, tap, distinctUntilChanged } from 'rxjs/operators';
 import Axios from 'axios';
 
 type Metadata = {
@@ -114,12 +115,27 @@ export default BaseAnnotationEditor.extend({
 		metadata(): Metadata { return this.definition.metadata as Metadata; },
 		annotationId(): string { return this.metadata.annotationId; },
 		cql(): string|string[]|null {
+			/**
+			 * How do we want to do this?
+			 * we have 4 modes:
+			 *
+			 * single token, from input
+			 * 		split on whitespace outside quotes, join using |
+			 * single token, from list
+			 * 		escape values, join using |
+			 *
+			 * multi token, from input
+			 * 		split on whitespace outside quotes, create array
+			 * multi token, from list
+			 * 		escape values, join using |
+			 */
+
 			if (this.selectedWordforms && this.selectedWordforms.length) {
-				return this.selectedWordforms.map(escapeRegex).map(v => `${this.annotationId}="${v}"`).join('|');
+				return `${this.annotationId}="${this.selectedWordforms.map(escapeRegex).join('|')}"`;
 			}
 
-			const value = this.value as string;
-			if (!value && !value.trim()) {
+			const value = (this.value as string).trim();
+			if (!value) {
 				return null;
 			}
 
@@ -130,49 +146,46 @@ export default BaseAnnotationEditor.extend({
 					return [];
 				}
 				const inQuotes = (i % 2) !== 0;
-				// alrighty,
-				// "split word" behind another few --> ["split word", "behind", "another", "few"]
-				// "wild* in split words" and such --> ["wild.* in split words", "and", "such"]
-
-				return inQuotes ? wildcardToRegex(v) : v.split(/\s+/).filter(s => !!s).map(val => wildcardToRegex(val));
+				if (inQuotes) {
+					// Keep value together including any contained whitespace contained therein
+					return wildcardToRegex(v);
+				} else {
+					// Split value on whitespace, escape parts individually and remove empty strings (splitting artifacts)
+					return v.split(/\s+/).filter(s => !!s).map(wildcardToRegex);
+				}
 			});
 
-			debugLog('recalculated cql for annotation '+this.id);
-			return resultParts.length ? this.outputMultipleTokens ? resultParts.map(v => `${this.annotationId}="${v}"`) : `${this.annotationId}="${resultParts.join('|')}"` : null;
+			// Now we have our value split on whitespace and escaped
+			// debugLog('recalculated cql for annotation '+this.id);
+			if (!resultParts.length) {
+				return null;
+			}
+			if (this.outputMultipleTokens) { // Only supported for the textual input, lexicon values are always OR'ed
+				return resultParts.map(v => `${this.annotationId}="${v}"`);
+			} else {
+				return `${this.annotationId}="${resultParts.join('|')}"`;
+			}
 		},
+		lexiconValue(): string|null {
+			return this.selectedWordforms && this.selectedWordforms.length ? this.selectedWordforms.join('|') : null;
+		}
 	},
 	methods: {
-		decodeInitialState(ast: Token[]): string|undefined {
-			if (ast.length !== 1) {
-				return undefined;
+		decodeInitialState(cql: SimpleCqlToken[], ast: Token[]): string|undefined {
+			const stripCase = (value: string) => value.replace(/^\(\?-?[ic]\)/, '');
+
+			if (!this.outputMultipleTokens) {
+				cql = cql.slice(0, 1);
 			}
 
-			const token = ast[0];
-			if (
-				token.leadingXmlTag ||
-				token.trailingXmlTag ||
-				token.expression ||
-				token.optional
-			) {
-				return undefined;
+			while (cql.length && !cql[cql.length-1][this.annotationId]) {
+				cql.pop();
 			}
 
-			const values = [] as string[];
-			const stack = [token.expression!];
-			let cur: (typeof stack)[number];
-			// tslint:disable-next-line
-			while (cur = stack.shift()!) {
-				if (cur.type === 'binaryOp') {
-					stack.push(cur.left, cur.right);
-				} else if (cur.type === 'attribute' && cur.name === this.annotationId) {
-					values.push(unescapeRegex(cur.value));
-				} else {
-					// complex query? cannot parse
-					return undefined;
-				}
-			}
-
-			return values.join('|') || undefined;
+			return cql.map((tok, index) => {
+				const values = tok[this.annotationId];
+				return values ? values.map(v => regexToWildcard(stripCase(v))).map(v => v.match('/\s+/') ? `"${v}"` : v).join('|') : '*';
+			}).join(' ');
 		},
 		// onInput(input: string) { this.lemma$.next(input); },
 		onPosChange(input: string) { this.pos$.next(input); },
@@ -182,7 +195,7 @@ export default BaseAnnotationEditor.extend({
 		const input$ = Observable.combineLatest(this.lemma$, this.pos$);
 		const suggestions$ = input$.pipe(
 			debounceTime(500),
-			tap(v => console.log('getting suggestions...', v)),
+			// tap(([lemma, pos]) => console.log(`getting suggestions... lemma '${lemma}' pos '${pos}'`)),
 			switchMap<[string, string], string[]>(([lemma, pos]: [string, string]) => {
 				if (!lemma) {
 					return Observable.of([] as string[]);
@@ -221,18 +234,20 @@ export default BaseAnnotationEditor.extend({
 					}),
 				);
 			}),
-			tap(v => console.log('received suggestions...', v)),
+			// tap(v => console.log('received suggestions...', v)),
 		);
 
 		const results$ = Observable.merge(
 			input$.pipe(mapTo(null)),
 			suggestions$
+		).pipe(
+			distinctUntilChanged()
 		);
 
 		this.subscriptions.push(
 			results$.subscribe(r => {
 			this.suggestions = r;
-			console.log('got suggestions in subscribe handler', r);
+			// console.log('got suggestions in subscribe handler', r);
 		}));
 	},
 	destroyed() {

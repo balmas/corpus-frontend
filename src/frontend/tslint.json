@@ -14,6 +14,11 @@
 		"jsx-no-multiline-js": false,
 		"object-literal-key-quotes": false,
 		"class-name": false,
+		"no-console": {
+			"severity": "error",
+			// allow only warn
+			"options": ["log", "debug", "info", "trace", "time", "timeEnd"]
+		},
 
 		// These should eventually be fixed
 		"prefer-const": {"severity": "warn"},

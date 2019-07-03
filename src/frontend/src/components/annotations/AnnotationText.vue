@@ -1,7 +1,7 @@
 <template>
 	<div :title="id" class="form-group propertyfield" :id="definition.id"> <!-- behaves as .row when in .form-horizontal so .row may be omitted -->
 
-		<label :for="inputId" class="col-xs-12 col-md-3" :title="definition.description || undefined">{{definition.displayName}}</label>
+		<label :for="inputId" :class="['col-xs-12', 'col-md-3', {disabled}]" :title="definition.description || undefined">{{definition.displayName}}</label>
 		<div class="col-xs-12 col-md-9">
 			<div class="input-group">
 				<input
@@ -13,17 +13,19 @@
 					:placeholder="definition.displayName"
 					:dir="textDirection"
 					:value="value.value"
+					:disabled="disabled"
 
 					@input="e_input({value: $event.target.value, caseSensitive: value.caseSensitive})"
 				/>
 				<div class="input-group-btn">
-					<label class="btn btn-default file-input-button" :for="fileInputId">
+					<label :class="['btn btn-default file-input-button', {disabled}]" :for="fileInputId">
 						<span class="fa fa-upload fa-fw"></span>
 						<input
 							type="file"
 							title="Upload a list of values"
 
 							:id="fileInputId"
+							:disabled="disabled"
 
 							@change="onFileChanged"
 						>
@@ -31,13 +33,14 @@
 				</div>
 			</div>
 			<div v-if="metadata.caseSensitive" class="checkbox">
-				<label :for="caseInputId">
+				<label :for="caseInputId" :class="{disabled}">
 					<input
 						type="checkbox"
 
 						:id="caseInputId"
 						:name="caseInputId"
 						:checked="value.caseSensitive"
+						:disabled="disabled"
 
 						@change="e_input({value: value.value, caseSensitive: $event.target.checked})"
 					>Case and diacritics sensitive</label>
@@ -47,7 +50,7 @@
 </template>
 
 <script lang="ts">
-import BaseAnnotationEditor from '@/components/annotations/Annotation';
+import BaseAnnotationEditor, { SimpleCqlToken } from '@/components/annotations/Annotation';
 
 import { escapeLucene, MapOf, unescapeLucene, regexToWildcard, wildcardToRegex } from '@/utils';
 import { FilterValue } from '@/types/apptypes';
@@ -85,6 +88,12 @@ export default BaseAnnotationEditor.extend({
 				return null;
 			}
 
+			// if single token, transform wildcards and return entire value
+			if (!this.outputMultipleTokens) {
+				return `${this.annotationId}="${caseSensitive ? '(?-i)' : ''}${wildcardToRegex(value)}"`;
+			}
+
+			// if multiple tokens, split on quotes and whitespace outside quotes, and transform wildcards
 			let resultParts = value
 			.trim()
 			.split(/"/)
@@ -101,56 +110,32 @@ export default BaseAnnotationEditor.extend({
 			});
 
 			debugLog('recalculated cql for annotation '+this.id);
-
 			resultParts = resultParts.map(v => caseSensitive ? `(?-i)${v}` : v);
 			return resultParts.length ? this.outputMultipleTokens ? resultParts.map(v => `${this.annotationId}="${v}"`) : `${this.annotationId}="${resultParts.join('|')}"` : null;
 		},
 	},
 	methods: {
-		decodeInitialState(ast: Token[]): Value|undefined {
+		decodeInitialState(cql: SimpleCqlToken[], ast: Token[]): Value|undefined {
 			function isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); }
 			function stripCase(value: string) { return value.substr(value.startsWith('(?-i)') ? 5 : 4); }
 
-			const values: Array<string|null> = [];
-			let caseSensitive = false;
-
-			for (const token of ast) {
-				let hasValueAtPosition = false;
-				if (token.leadingXmlTag || token.trailingXmlTag || token.repeats || token.optional) {
-					return undefined;
-				}
-
-				const stack = [token.expression];
-				let exp: Token['expression'];
-				// tslint:disable-next-line
-				while (exp = stack.shift()) {
-					if (exp.type === 'binaryOp') {
-						if (exp.operator !== '&') {
-							// Clauses combined in an unsupported way, cannot parse.
-							return undefined;
-						}
-
-						stack.push(exp.left, exp.right);
-					} else if (exp.name === this.annotationId) {
-						if (hasValueAtPosition) {
-							// multiple values for the same annotation in the same token - unsupported.
-							return undefined;
-						}
-
-						let value = exp.value;
-						if (isCase(value)) {
-							value = stripCase(exp.value);
-							caseSensitive = true;
-						}
-						value = regexToWildcard(value);
-						if (value.match(/\s+/)) {
-							value = `"${value}"`;
-						}
-						values.push(value);
-						hasValueAtPosition = true;
-					}
-				}
+			if (!this.outputMultipleTokens) {
+				cql = cql.slice(0, 1);
 			}
+
+			// remove trailing tokens without a value for this annotation
+			while (cql.length && !cql[cql.length-1][this.annotationId]) {
+				cql.pop();
+			}
+
+			let caseSensitive = false;
+			const values = cql.map(token => {
+				const tokenValues = token[this.annotationId] || [];
+				caseSensitive = caseSensitive || (this.metadata.caseSensitive && tokenValues.some(isCase));
+
+				const joinedValue = tokenValues ? tokenValues.map(v => isCase(v) ? stripCase(v) : v).map(regexToWildcard).join('|') : '*';
+				return joinedValue.match(/\s+/) && this.outputMultipleTokens ? `"${joinedValue}"` : joinedValue;
+			});
 
 			return {
 				caseSensitive,

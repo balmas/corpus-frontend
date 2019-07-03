@@ -3,6 +3,10 @@ import Vue from 'vue';
 import { AnnotationEditorDefinition } from '@/store/search/form/annotations';
 import { Token } from '@/utils/cqlparser';
 import uid from '@/mixins/uid';
+import { MapOf } from '@/utils';
+
+/** Values have already been decoded from regex to wildcard! */
+export type SimpleCqlToken = MapOf<string[]>;
 
 const baseAnnotationEditor = Vue.extend({
 	mixins: [uid],
@@ -18,7 +22,8 @@ const baseAnnotationEditor = Vue.extend({
 			required: true
 		},
 		/** Allow split entered values over over multiple tokens or not? */
-		outputMultipleTokens: Boolean
+		outputMultipleTokens: Boolean,
+		disabled: Boolean
 	},
 	methods: {
 		// Implemented as multiple events because our value is a prop
@@ -32,7 +37,7 @@ const baseAnnotationEditor = Vue.extend({
 		 * When this is called the component will not have been mounted, though all props with exception of value will be available.
 		 * If the query could not be decoded, null should be returned.
 		 */
-		decodeInitialState(ast: Token[]): any { throw new Error('missing decodeInitialState() implementation in annotation editor'); },
+		decodeInitialState(tokens: SimpleCqlToken[], ast: Token[]): any { throw new Error('missing decodeInitialState() implementation in annotation editor'); },
 
 		// -- utils --
 		isCase(value: string) { return value.startsWith('(?-i)') || value.startsWith('(?c)'); },

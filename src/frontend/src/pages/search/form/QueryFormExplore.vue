@@ -98,6 +98,7 @@
 							:definition="token"
 							:textDirection="textDirection"
 							:value="ngramTokenValues[index].value || undefined"
+							:disabled="index >= ngramSize"
 
 							@change-value="updateTokenValue(index, {value: $event})"
 							@change-cql="updateTokenValue(index, {cql: $event})"
@@ -247,7 +248,7 @@ export default Vue.extend({
 		this.corporaGroupBy = `field:${UIStore.getState().explore.defaultMetadataFieldId}`;
 		this.ngramType = UIStore.getState().explore.defaultAnnotationId;
 		this.corporaGroupDisplayMode = this.corporaGroupDisplayModeOptions[0];
-	}
+	},
 });
 </script>
 

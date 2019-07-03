@@ -84,7 +84,7 @@
 			<li class="menu-header">
 			<div v-if="loading && this.editable /* not visible in button when editable */" class="text-center">
 				<span class="fa fa-spinner fa-spin text-muted"></span>
-			</div><button v-if="resettable"
+			</div><button v-if="resettable && filteredOptions.length"
 				type="button"
 				class="btn btn-sm btn-default menu-reset"
 				tabindex="-1"

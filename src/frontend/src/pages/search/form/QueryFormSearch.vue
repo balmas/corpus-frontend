@@ -23,7 +23,7 @@
 				</div>
 			</div>
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='extended'}]" id="extended">
-				<!-- <template v-if="useTabs">
+				<template v-if="useTabs">
 					<ul class="nav nav-tabs subtabs">
 						<li v-for="(tab, index) in tabs" :class="{'active': index === 0}" :key="index">
 							<a :href="'#'+getTabId(tab.name)" data-toggle="tab">{{tab.name}}</a>
@@ -59,7 +59,7 @@
 						@change-value="onAnnotationValueChange(editor.definition.id, $event)"
 						@change-cql="onAnnotationCqlChange(editor.definition.id, $event)"
 					/>
-				</template> -->
+				</template>
 
 				<!-- show this even if it's disabled when "within" contains a value, or you can never remove the value -->
 				<!-- this will probably never happen - but it could, if someone manually imports a query with a "within" clause active -->
