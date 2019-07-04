@@ -1,50 +1,48 @@
+
 <template>
 	<div :title="id" class="form-group propertyfield" :id="definition.id"> <!-- behaves as .row when in .form-horizontal so .row may be omitted -->
+		<label v-if="size === 'm'" :for="inputId" :class="['col-xs-12', 'col-md-3', {disabled}]" :title="definition.description || undefined">{{definition.displayName}}</label>
+		<div class="input-group col-xs-12 col-md-9">
+			<input
+				type="text"
 
-		<label :for="inputId" :class="['col-xs-12', 'col-md-3', {disabled}]" :title="definition.description || undefined">{{definition.displayName}}</label>
-		<div class="col-xs-12 col-md-9">
-			<div class="input-group">
-				<input
-					type="text"
-					class="form-control"
+				:id="inputId"
+				:name="inputId"
+				:class="{'form-control':true,'input-lg':size==='l','input-sm':size==='s'}"
+				:placeholder="definition.displayName"
+				:dir="textDirection"
+				:value="value.value"
+				:disabled="disabled"
 
-					:id="inputId"
-					:name="inputId"
-					:placeholder="definition.displayName"
-					:dir="textDirection"
-					:value="value.value"
-					:disabled="disabled"
-
-					@input="e_input({value: $event.target.value, caseSensitive: value.caseSensitive})"
-				/>
-				<div class="input-group-btn">
-					<label :class="['btn btn-default file-input-button', {disabled}]" :for="fileInputId">
-						<span class="fa fa-upload fa-fw"></span>
-						<input
-							type="file"
-							title="Upload a list of values"
-
-							:id="fileInputId"
-							:disabled="disabled"
-
-							@change="onFileChanged"
-						>
-					</label>
-				</div>
-			</div>
-			<div v-if="metadata.caseSensitive" class="checkbox">
-				<label :for="caseInputId" :class="{disabled}">
+				@input="e_input({value: $event.target.value, caseSensitive: value.caseSensitive})"
+			/>
+			<div class="input-group-btn">
+				<label :class="['btn btn-default file-input-button', {disabled,'btn-lg':size==='l','btn-sm':size==='s'}]" :for="fileInputId">
+					<span class="fa fa-upload fa-fw"></span>
 					<input
-						type="checkbox"
+						type="file"
+						title="Upload a list of values"
 
-						:id="caseInputId"
-						:name="caseInputId"
-						:checked="value.caseSensitive"
+						:id="fileInputId"
 						:disabled="disabled"
 
-						@change="e_input({value: value.value, caseSensitive: $event.target.checked})"
-					>Case and diacritics sensitive</label>
+						@change="onFileChanged"
+					>
+				</label>
 			</div>
+		</div>
+		<div v-if="metadata.caseSensitive && size === 'm'" class="checkbox col-xs-12 col-md-9 col-md-push-3 checkbox-col">
+			<label :for="caseInputId" :class="{disabled}">
+				<input
+					type="checkbox"
+
+					:id="caseInputId"
+					:name="caseInputId"
+					:checked="value.caseSensitive"
+					:disabled="disabled"
+
+					@change="e_input({value: value.value, caseSensitive: $event.target.checked})"
+				>Case and diacritics sensitive</label>
 		</div>
 	</div>
 </template>
@@ -170,5 +168,4 @@ export default BaseAnnotationEditor.extend({
 </script>
 
 <style lang="scss">
-
 </style>

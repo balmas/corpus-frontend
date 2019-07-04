@@ -21,6 +21,11 @@ const baseAnnotationEditor = Vue.extend({
 			type: String as () => 'ltr'|'rtl',
 			required: true
 		},
+		size: {
+			type: String as () => 's'|'m'|'l',
+			required: false,
+			default: 'm'
+		},
 		/** Allow split entered values over over multiple tokens or not? */
 		outputMultipleTokens: Boolean,
 		disabled: Boolean

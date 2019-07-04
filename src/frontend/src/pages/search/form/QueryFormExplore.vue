@@ -94,6 +94,7 @@
 							@change="updateTokenAnnotation(index, $event)"
 						/>
 						<Component :key="token.componentName"
+							size="s"
 							:is="token.componentName"
 							:definition="token"
 							:textDirection="textDirection"

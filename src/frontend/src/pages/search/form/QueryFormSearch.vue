@@ -9,18 +9,18 @@
 		</ul>
 		<div class="tab-content">
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='simple'}]" id="simple">
-				<div class="form-group form-group-lg">
-					<Component v-if="simpleAnnotationEditor"
-						outputMultipleTokens
-						:is="simpleAnnotationEditor.definition.componentName"
-						:definition="simpleAnnotationEditor.definition"
-						:textDirection="textDirection"
-						:value="simpleAnnotationEditor.value.value != null ? simpleAnnotationEditor.value.value : undefined"
+				<Component v-if="simpleAnnotationEditor"
+					size="l"
+					outputMultipleTokens
 
-						@change-value="onSimpleAnnotationValueChange"
-						@change-cql="onSimpleAnnotationCqlChange"
-					/>
-				</div>
+					:is="simpleAnnotationEditor.definition.componentName"
+					:definition="simpleAnnotationEditor.definition"
+					:textDirection="textDirection"
+					:value="simpleAnnotationEditor.value.value != null ? simpleAnnotationEditor.value.value : undefined"
+
+					@change-value="onSimpleAnnotationValueChange"
+					@change-cql="onSimpleAnnotationCqlChange"
+				/>
 			</div>
 			<div :class="['tab-pane form-horizontal', {'active': activePattern==='extended'}]" id="extended">
 				<template v-if="useTabs">
@@ -36,6 +36,7 @@
 							:id="getTabId(tab.name)"
 						>
 							<Component v-for="editor in tab.editors" :key="editor.definition.id"
+								size="m"
 								outputMultipleTokens
 								:is="editor.definition.componentName"
 								:definition="editor.definition"
@@ -50,6 +51,7 @@
 				</template>
 				<template v-else>
 					<Component v-for="editor in allEditors" :key="editor.definition.id"
+						size="m"
 						outputMultipleTokens
 						:is="editor.definition.componentName"
 						:definition="editor.definition"
@@ -272,9 +274,11 @@ export default Vue.extend({
 	border: 1px solid #ccc
 }
 
-#simple > .form-group {
-	margin: auto;
-	max-width: 1170px;
+@media(min-width: 1170px) {
+	#simple > .form-group {
+		margin: auto;
+		max-width: 1170px;
+	}
 }
 
 // Some bootstrap tab customization
@@ -309,6 +313,12 @@ textarea.gap-value-editor {
 	overflow: auto;
 	overflow-x: hidden;
 	margin-bottom: 15px;
+}
+
+.btn-group[class*="col-"],
+.checkbox[class*="col-"] {
+	padding-left: 0;
+	padding-right: 0;
 }
 
 </style>

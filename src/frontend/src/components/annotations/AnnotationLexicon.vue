@@ -1,13 +1,12 @@
 <template>
 	<div :title="id" class="form-group propertyfield" :id="definition.id"> <!-- behaves as .row when in .form-horizontal so .row may be omitted -->
-
-		<label :for="inputId" class="col-xs-12 col-md-3" :title="definition.description || undefined">{{definition.displayName}}</label>
+		<label v-if="size==='m'" :for="inputId" class="col-xs-12 col-md-3" :title="definition.description || undefined">{{definition.displayName}}</label>
 		<div class="col-xs-12 col-md-9">
 			<input
 				type="text"
-				class="form-control"
 
 				:id="inputId"
+				:class="{'form-control':true,'input-lg':size==='l','input-sm':size==='s'}"
 				:name="inputId"
 				:placeholder="definition.displayName"
 				:dir="textDirection"
@@ -23,6 +22,7 @@
 				:placeholder="definition.displayName"
 				:title="definition.description"
 				:dir="textDirection"
+				:data-class="{'btn-default': true, 'btn-lg': size === 'l', 'btn-sm': size==='s'}"
 
 				:loading="suggestions == null"
 				:options="suggestions || []"
