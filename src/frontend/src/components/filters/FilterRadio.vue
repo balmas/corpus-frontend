@@ -44,8 +44,9 @@ export default BaseFilter.extend({
 			return this.value ? `${this.id}:(${escapeLucene(this.value, false)})` : null;
 		},
 		luceneQuerySummary(): string|null {
-			const value = this.value as string;
-			return value ? this.optionsMap[value].label || value : null;
+			let value: string|null = this.value;
+			value = value ? this.optionsMap[value].label || value : null;
+			return value ? `${this.displayName}: ${value}` : null
 		}
 	},
 	methods: {

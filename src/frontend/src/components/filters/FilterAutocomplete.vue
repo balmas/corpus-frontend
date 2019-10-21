@@ -22,12 +22,6 @@
 </template>
 
 <script lang="ts">
-import { flatMap } from 'rxjs/operators';
-
-import { paths } from '@/api';
-import { escapeLucene, MapOf, unescapeLucene } from '@/utils';
-import { FilterValue } from '@/types/apptypes';
-
 import Autocomplete from '@/components/Autocomplete.vue';
 import FilterText from '@/components/filters/FilterText.vue';
 

@@ -59,7 +59,7 @@ export default BaseFilter.extend({
 		luceneQuerySummary(): string|null {
 			let surroundWithQuotes = false;
 
-			const value = (this.value as string)
+			const splitValue = (this.value as string)
 			.split(/"/)
 			.flatMap((v, i) => {
 				const inQuotes = (i % 2) !== 0;
@@ -71,7 +71,8 @@ export default BaseFilter.extend({
 					return v.split(/\s+/).filter(vv => !!vv);
 				}
 			});
-			return (value.length >= 2 || surroundWithQuotes) ? value.map(vv => `"${vv}"`).join(', ') : value.join(', ');
+			const value = (splitValue.length >= 2 || surroundWithQuotes) ? splitValue.map(vv => `"${vv}"`).join(', ') : splitValue.join(', ');
+			return value ? `${this.displayName}: ${value}` : null;
 		}
 	},
 	methods: {

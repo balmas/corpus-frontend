@@ -201,7 +201,8 @@ export default BaseFilter.extend({
 			return this.value.low && this.value.high ? `(${lf}:[${ll} TO ${lh}] ${op} ${hf}:[${hl} TO ${hh}])` : null;
 		},
 		luceneQuerySummary(): string|null {
-			return this.luceneQuery ? `${this.value.low.padStart(4, '0')}-${this.value.high.padStart(4, '0')}` : null;
+			const value = this.luceneQuery ? `${this.value.low.padStart(4, '0')}-${this.value.high.padStart(4, '0')}` : null;
+			return value ? `${this.displayName}: ${value}` : null;
 		}
 	},
 	methods: {

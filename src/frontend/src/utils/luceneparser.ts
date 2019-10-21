@@ -2,7 +2,12 @@ import luceneQueryParser from 'lucene-query-parser';
 
 import {debugLog} from '@/utils/debug';
 
-import {FilterValue} from '@/types/apptypes';
+export type FilterValue = {
+	/** Unique id of the metadata field */
+	readonly id: string;
+	/** Values of the filter, for selects, the selected values as array elements, for text, the text as the first array element, for ranges the min and max values in indices [0][1] */
+	values: string[];
+};
 
 /** Parse the expression into an array of filter fields for easy displaying. Throws error if the query is too complex or contains errors. */
 export default (luceneQuery?: string): FilterValue[] => {

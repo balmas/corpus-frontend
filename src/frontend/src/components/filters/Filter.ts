@@ -1,8 +1,8 @@
 import Vue from 'vue';
 
 // just for whatever metadata might be needed here.
-import { FilterValue, FilterDefinition } from '@/types/apptypes';
 import { MapOf } from '@/utils';
+import { FilterDefinition, FilterState } from '@/store/search/form/filters';
 
 const baseFilter = Vue.extend({
 	props: {

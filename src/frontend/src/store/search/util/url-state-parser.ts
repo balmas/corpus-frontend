@@ -5,7 +5,7 @@ import memoize from 'memoize-decorator';
 import BaseUrlStateParser from '@/store/util/url-state-parser-base';
 import LuceneQueryParser from 'lucene-query-parser';
 
-import {mapReduce, MapOf, decodeAnnotationValue} from '@/utils';
+import {mapReduce, decodeAnnotationValue} from '@/utils';
 import parseCql, {Attribute} from '@/utils/cqlparser';
 import parseLucene from '@/utils/luceneparser';
 import {debugLog} from '@/utils/debug';
@@ -29,7 +29,7 @@ import * as DocResultsModule from '@/store/search/results/docs';
 import * as GlobalResultsModule from '@/store/search/results/global';
 import * as HitResultsModule from '@/store/search/results/hits';
 
-import {FilterValue, AnnotationValue} from '@/types/apptypes';
+import { AnnotationValue } from '@/types/apptypes';
 
 import BaseFilter from '@/components/filters/Filter';
 import cloneDeep from 'clone-deep';
@@ -45,7 +45,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	 * So in order to decode the query, we need knowledge of which filters are configured.
 	 * This is done by the FilterModule, so we need that info here.
 	 */
-	constructor(private registeredMetadataFilters: FilterModule.ModuleRootState, uri?: uri.URI) {
+	constructor(uri?: uri.URI) {
 		super(uri);
 	}
 
@@ -76,7 +76,7 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 	}
 
 	@memoize
-	private get filters(): FilterModule.ModuleRootState {
+	private get filters(): FilterModule.ModuleRootState['filterStates'] {
 		const luceneString = this.getString('filter', null, v=>v?v:null);
 		if (luceneString == null) {
 			return {};
@@ -84,21 +84,23 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 
 		try {
 			const luceneParsedThing = LuceneQueryParser.parse(luceneString);
-			const parsedQuery: MapOf<FilterValue> = mapReduce(parseLucene(luceneString), 'id');
+			const parsedQuery = mapReduce(parseLucene(luceneString), 'id');
 
-			const metadataFields = CorpusModule.get.allMetadataFieldsMap();
-			const shownFilters = new Set<string>(UIModule.getState().search.shared.searchFilterIds.concat(
-				Object.keys(FilterModule.getState().filters)
-				.filter(id => metadataFields[id] == null)
-			));
-			const parsedQuery2: FilterModule.FullFilterState[] =
-			Object.values(this.registeredMetadataFilters)
-			.filter(f => shownFilters.has(f.id)) // Do not parse filters that are not in the ui
-			.map(filter => {
+			const filters = FilterModule.getState().filterDefs;
+			const shownFilters = new Set(UIModule.getState().search.shared.searchFilterIds);
+			const shownFilterStates: FilterModule.FilterState[] =
+			Object.values(filters)
+			.filter(f => shownFilters.has(f.id) || !f.isMetadataField) // Do not parse filters that are not in the ui, custom filters (those that are not a metadata field) are always shown
+			.map<FilterModule.FilterState>(filter => {
 				const vueComponent = Vue.component(filter.componentName) as typeof BaseFilter;
 				if (!vueComponent) {
 					console.warn(`Filter ${filter.id} defines its vue component as ${filter.componentName} but it does not exist! (have you registered it properly with vue?)`);
-					return filter;
+					return {
+						id: filter.id,
+						lucene: null,
+						summary: null,
+						value: null,
+					};
 				}
 
 				const vueComponentInstance = new vueComponent({
@@ -112,23 +114,21 @@ export default class UrlStateParser extends BaseUrlStateParser<HistoryModule.His
 				}) as any;
 
 				const componentValue = vueComponentInstance.decodeInitialState(parsedQuery, luceneParsedThing);
-				const storeValue: FilterModule.FilterState = {
+				const filterState: FilterModule.FilterState = {
+					id: filter.id,
 					value: componentValue != null ? componentValue : undefined,
 					summary: null,
 					lucene: null
 				};
 				if (componentValue != null) { // don't overwrite default value
 					Vue.set(vueComponentInstance._props, 'value', componentValue);
-					storeValue.summary = vueComponentInstance.luceneQuerySummary;
-					storeValue.lucene = vueComponentInstance.luceneQuery;
+					filterState.summary = vueComponentInstance.luceneQuerySummary;
+					filterState.lucene = vueComponentInstance.luceneQuery;
 				}
-				return {
-					...filter,
-					...storeValue
-				};
+				return filterState;
 			});
 
-			return mapReduce(parsedQuery2, 'id');
+			return mapReduce(shownFilterStates, 'id');
 		} catch (error) {
 			debugLog('Cannot decode lucene query ', luceneString, error);
 			return {};

@@ -55,7 +55,8 @@ export default BaseFilter.extend({
 			const selected = (this.value as string[])
 			.map(v => this.optionsMap[v].label || v);
 
-			return selected.length >= 2 ? selected.map(v => `"${v}"`).join(', ') : selected[0] || null;
+			const value = selected.length >= 2 ? selected.map(v => `"${v}"`).join(', ') : selected[0] || null;
+			return value ? `${this.displayName}: ${value}` : null;
 		}
 	},
 	methods: {

@@ -58,7 +58,8 @@ export default BaseFilter.extend({
 				null;
 		},
 		luceneQuerySummary(): string|null {
-			return this.luceneQuery ? `${this.value.low || '0'} - ${this.value.high || '9999'}` : null;
+			const value = this.luceneQuery ? `${this.value.low || '0'} - ${this.value.high || '9999'}` : null;
+			return value ? `${this.displayName}: ${value}` : null;
 		}
 	},
 	methods: {

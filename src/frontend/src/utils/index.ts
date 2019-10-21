@@ -112,9 +112,9 @@ export function getFilterString(filters: FilterState[]): string|undefined {
 }
 
 // NOTE: range filter has hidden defaults for unset field (min, max), see https://github.com/INL/corpus-frontend/issues/234
-export const getFilterSummary = (filters: FullFilterState[]): string|undefined => filters
+export const getFilterSummary = (filters: FilterState[]): string|undefined => filters
 	.filter(f => !!f.lucene && !!f.summary)
-	.map(f => `${f.displayName}: ${f.summary}`)
+	// .map(f => `${f.displayName}: ${f.summary}`)
 	.join(', ') || undefined;
 
 export const decodeAnnotationValue = (value: string|string[], type: Required<AppTypes.AnnotationValue>['type']): {case: boolean; value: string} => {

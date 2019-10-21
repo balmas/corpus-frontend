@@ -195,45 +195,45 @@ export type AnnotationValue = {
 	readonly type?: NormalizedAnnotation['uiType'];
 };
 
-export type FilterValue = {
-	/** Unique id of the metadata field */
-	readonly id: string;
-	/**
-	 * Type of the filter, determines how the values are interpreted and read from the DOM
-	 * See CorpusConfig.java/search.vm
-	 *
-	 * 'range' -> has two numerical inputs, min and max
-	 * 'select' -> is a multiselect field
-	 *
-	 * There is also 'combobox' and 'text',
-	 * but these are just a regular text input (with some autocompletion on combobox)
-	 * and can be treated the same way for the purposes of state and DOM manipulation
-	 *
-	 * It's possible for a user to specify another type (using uiType for annotatedFields and metadataFields in the index format),
-	 * but this should just be ignored and treated as 'text'.
-	 */
-	type: NormalizedMetadataField['uiType'];
-	/** Values of the filter, for selects, the selected values as array elements, for text, the text as the first array element, for ranges the min and max values in indices [0][1] */
-	values: string[];
-};
+// export type FilterValue = {
+// 	/** Unique id of the metadata field */
+// 	readonly id: string;
+// 	/**
+// 	 * Type of the filter, determines how the values are interpreted and read from the DOM
+// 	 * See CorpusConfig.java/search.vm
+// 	 *
+// 	 * 'range' -> has two numerical inputs, min and max
+// 	 * 'select' -> is a multiselect field
+// 	 *
+// 	 * There is also 'combobox' and 'text',
+// 	 * but these are just a regular text input (with some autocompletion on combobox)
+// 	 * and can be treated the same way for the purposes of state and DOM manipulation
+// 	 *
+// 	 * It's possible for a user to specify another type (using uiType for annotatedFields and metadataFields in the index format),
+// 	 * but this should just be ignored and treated as 'text'.
+// 	 */
+// 	type: NormalizedMetadataField['uiType'];
+// 	/** Values of the filter, for selects, the selected values as array elements, for text, the text as the first array element, for ranges the min and max values in indices [0][1] */
+// 	values: string[];
+// };
 
-export type FilterDefinition = {
-	/** Id of the filters, this must be unique */
-	id: string;
-	displayName: string;
-	description?: string;
-	/** Name of the component, for filters generated from the blacklab index metadata, `filter-${uiType}` */
-	componentName: string;
-	/** The group this filter is part of, only for ui purposes. */
-	groupId?: string;
-	/**
-	 * Other info the filter component may require, such as options in a dropdown list for a filter of type Select.
-	 * This is usually empty for the normal text, range, autocomplete types. But for select, radio, and checkbox this contains the available options.
-	 * For 'pos' this contains the tagset.
-	 * Custom filter types may place whatever data they require here and it will be made available as a prop.
-	 */
-	metadata: any;
-};
+// export type FilterDefinition = {
+// 	/** Id of the filters, this must be unique */
+// 	id: string;
+// 	displayName: string;
+// 	description?: string;
+// 	/** Name of the component, for filters generated from the blacklab index metadata, `filter-${uiType}` */
+// 	componentName: string;
+// 	/** The group this filter is part of, only for ui purposes. */
+// 	groupId?: string;
+// 	/**
+// 	 * Other info the filter component may require, such as options in a dropdown list for a filter of type Select.
+// 	 * This is usually empty for the normal text, range, autocomplete types. But for select, radio, and checkbox this contains the available options.
+// 	 * For 'pos' this contains the tagset.
+// 	 * Custom filter types may place whatever data they require here and it will be made available as a prop.
+// 	 */
+// 	metadata: any;
+// };
 
 // -------------------
 // Configuration types

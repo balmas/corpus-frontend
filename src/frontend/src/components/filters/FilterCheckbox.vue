@@ -7,16 +7,14 @@
 		<label class="col-xs-12" :for="inputId">{{displayName}}</label>
 		<div class="col-xs-12">
 			<div class="checkbox" v-for="(option, index) in options" :key="index">
-				<!-- TODO optimize this, currently rewriting all values, ergo rerendering all checkboxes every time one changes -->
 				<label :for="inputId+'_'+index" :title="option.title"><input
 					type="checkbox"
 
-					:value="option.value"
+					:value="option"
 					:name="inputId+'_'+index"
 					:id="inputId+'_'+index"
-					:checked="value[option.value]"
 
-					@change="toggleCheckbox(option.value, $event.target.checked);"
+					v-model="model"
 				> {{option.label || option.value}}</label>
 			</div>
 		</div>
@@ -26,21 +24,23 @@
 
 <script lang="ts">
 import BaseFilter from '@/components/filters/Filter';
-import { FilterValue } from '@/types/apptypes';
 import { Option } from '@/components/SelectPicker.vue';
 import { MapOf, mapReduce, escapeLucene, unescapeLucene } from '@/utils';
+import { FilterValue } from '@/utils/luceneparser';
 
 export default BaseFilter.extend({
 	props: {
 		value: {
-			type: Object as () => {
-				[value: string]: boolean;
-			},
+			type: Array as () => string[],
 			required: true,
-			default: () => ({})
+			default: () => []
 		}
 	},
 	computed: {
+		model: {
+			get(): string[] { return this.value.map(v => this.options.find(o => o.value === v)!); },
+			set(v: Option[]) { this.e_input(v.map(o => o.value)); }
+		},
 		options(): Option[] { return this.definition.metadata; },
 		optionsMap(): MapOf<Option> { return mapReduce(this.options, 'value'); },
 		luceneQuery(): string|null {
@@ -58,26 +58,15 @@ export default BaseFilter.extend({
 				.filter(([value, isSelected]) => isSelected)
 				.map(([value, isSelected]) => this.optionsMap[value].label || value);
 
-			return selected.length >= 2 ? selected.map(v => `"${v}"`).join(', ') : selected[0] || null;
+			const value = selected.length >= 2 ? selected.map(v => `"${v}"`).join(', ') : selected[0] || null;
+			return value ? `${this.displayName}: ${value}` : null;
 		}
 	},
 	methods: {
-		toggleCheckbox(value: string, checked: boolean) {
-			this.e_input({
-				...this.value,
-				[value]: checked
-			});
-		},
-
-		decodeInitialState(filterValues: MapOf<FilterValue>): MapOf<boolean>|null {
+		decodeInitialState(filterValues: MapOf<FilterValue>): string[] {
 			const v = filterValues[this.id];
 
-			const values = v ? v.values.map(unescapeLucene).map(val => this.optionsMap[val]).filter(opt => opt != null) : undefined;
-			if (!values || !values.length) {
-				return null;
-			}
-
-			return mapReduce(values, 'value', value => true);
+			return v ? v.values : [];
 		},
 	},
 });
